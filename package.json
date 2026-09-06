@@ -41,10 +41,10 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/yourusername/polaris-nav"
+    "url": "https://github.com/NIK921129/polaris_nav"
   },
   "bugs": {
-    "url": "https://github.com/yourusername/polaris-nav/issues"
+    "url": "https://github.com/NIK921129/polaris_nav/issues"
   },
   "homepage": "https://polaris-nav.vercel.app",
   "engines": {
@@ -66,7 +66,7 @@
     "mongoose": "^7.0.3",
     "multer": "^1.4.5-lts.1",
     "node-cache": "^5.1.2",
-    "nodemailer": "^6.9.1",,
+    "nodemailer": "^6.9.1",
     "socket.io": "^4.5.4",
     "jimp": "^0.22.10",
     "twilio": "^3.84.0",
