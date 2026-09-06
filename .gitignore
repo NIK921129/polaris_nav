@@ -1,0 +1,286 @@
+# ============================================================
+# POLARIS NAV - .gitignore
+# ============================================================
+
+# ============================================================
+# NODE MODULES
+# ============================================================
+node_modules/
+node_modules/
+.env
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# ============================================================
+# ENVIRONMENT VARIABLES
+# ============================================================
+.env
+.env.local
+.env.*.local
+.env.production
+.env.development
+.env.test
+
+# ============================================================
+# LOGS
+# ============================================================
+logs/
+*.log
+logs/*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.pnpm-debug.log*
+
+# ============================================================
+# DATABASE
+# ============================================================
+*.db
+*.sqlite
+*.sqlite3
+mongodb-data/
+data/
+dump/
+*.dump
+*.backup
+
+# ============================================================
+# BACKUP FILES
+# ============================================================
+*.bak
+*.backup
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ============================================================
+# IDE / EDITOR
+# ============================================================
+.vscode/
+.idea/
+*.iml
+*.iws
+*.ipr
+.vscode/*
+!.vscode/extensions.json
+.idea/*
+*.sublime-project
+*.sublime-workspace
+.project
+.classpath
+.settings/
+
+# ============================================================
+# OS GENERATED
+# ============================================================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Desktop.ini
+*.tmp
+*.temp
+
+# ============================================================
+# BUILD / DIST
+# ============================================================
+dist/
+build/
+out/
+*.min.js
+*.min.css
+*.map
+*.tsbuildinfo
+
+# ============================================================
+# COVERAGE / TEST
+# ============================================================
+coverage/
+.nyc_output/
+*.lcov
+*.coverage
+test-results/
+jest-coverage/
+__tests__/coverage/
+
+# ============================================================
+# SECURITY / KEYS
+# ============================================================
+*.pem
+*.key
+*.crt
+*.csr
+*.p12
+*.pfx
+*.jks
+*.keystore
+*.truststore
+secrets/
+keys/
+certificates/
+*.secret
+*.token
+
+# ============================================================
+# CACHE
+# ============================================================
+.cache/
+.cache-loader/
+.parcel-cache/
+.next/
+.nuxt/
+.turbo/
+.eslintcache
+.prettiercache
+.stylelintcache
+*.tsbuildinfo
+
+# ============================================================
+# UPLOADS / MEDIA
+# ============================================================
+uploads/
+media/
+images/
+temp/
+temp-uploads/
+*.tmp
+*.temp
+
+# ============================================================
+# DOCKER
+# ============================================================
+docker-compose.override.yml
+.dockerignore
+Dockerfile.*
+*.dockerfile
+
+# ============================================================
+# MISC
+# ============================================================
+*.pid
+*.seed
+*.pid.lock
+.sass-cache/
+.less-cache/
+.stylus-cache/
+.vuepress/dist/
+.vercel/
+.netlify/
+.terraform/
+*.tfstate
+*.tfstate.*
+.terraform.lock.hcl
+
+# ============================================================
+# DEBUG / PROFILING
+# ============================================================
+debug/
+debug.log
+*.heapdump
+*.cpuprofile
+*.heapsnapshot
+*.prof
+chrome-devtools/
+
+# ============================================================
+# MONGOOSE / MONGODB
+# ============================================================
+mongodb.log
+mongod.log
+mongos.log
+
+# ============================================================
+# REDIS
+# ============================================================
+dump.rdb
+appendonly.aof
+redis.log
+
+# ============================================================
+# SESSION STORAGE
+# ============================================================
+session-store/
+sessions/
+*.session
+*.sid
+
+# ============================================================
+# PM2 / PROCESS MANAGER
+# ============================================================
+.pm2/
+pm2.log
+pm2-*.log
+
+# ============================================================
+# SENTRY
+# ============================================================
+.sentryclirc
+sentry.properties
+
+# ============================================================
+# ENCRYPTED FILES
+# ============================================================
+*.encrypted
+*.gpg
+*.asc
+
+# ============================================================
+# PROJECT SPECIFIC
+# ============================================================
+
+# Frontend build files (if any)
+frontend/dist/
+frontend/build/
+frontend/.cache/
+
+# Backend specific
+backend/logs/
+backend/temp/
+backend/uploads/
+backend/data/
+backend/migrations/*.js
+!backend/migrations/initial-setup.js
+
+# Environment specific
+.env.example
+.env.sample
+.env.local.sample
+
+# API key files (never commit!)
+api-keys.json
+api_keys.json
+secrets.json
+keys.json
+
+# Swagger/OpenAPI generated
+swagger.json
+openapi.json
+
+# Database migrations
+migrations/*.js
+!migrations/initial.js
+
+# Testing artifacts
+test-results/
+coverage/
+.nyc_output/
+
+# Temporary files
+*.swp
+*.swo
+*.tmp
+*.temp
+.DS_Store
