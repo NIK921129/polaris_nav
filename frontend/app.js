@@ -1,4 +1,52 @@
 // ============================================================
+// IMPORT API MANAGER
+// ============================================================
+// Make sure api-manager.js is loaded before app.js
+// In index.html, load in this order:
+// <script src="api-manager.js"></script>
+// <script src="app.js"></script>
+
+// ============================================================
+// UPDATE API CALLS TO USE THE MANAGER
+// ============================================================
+
+// Replace existing API calls with these:
+
+// Weather
+async function getWeather(lat, lng) {
+    const data = await API.getWeather(lat, lng);
+    console.log(`🌤️ Weather (${data.source}):`, data);
+    return data;
+}
+
+// Ice
+async function getIce(lat, lng) {
+    const data = await API.getIceConcentration(lat, lng);
+    console.log(`❄️ Ice (${data.source}):`, data);
+    return data;
+}
+
+// Route
+async function getRoute(start, end) {
+    const data = await API.getRoute(start, end);
+    console.log(`🚢 Route (${data.source}):`, data);
+    return data;
+}
+
+// AI
+async function getAIResponse(prompt) {
+    const data = await API.getAIResponse(prompt);
+    console.log(`🤖 AI (${data.source}):`, data);
+    return data;
+}
+
+// Hazards
+async function getHazards(lat, lng) {
+    const data = await API.getHazards(lat, lng);
+    console.log(`⚠️ Hazards (${data.source}):`, data);
+    return data;
+}
+// ============================================================
 // POLARIS NAV - COMPLETE APPLICATION
 // All JavaScript in one file
 // ============================================================
