@@ -11,6 +11,17 @@
     <link rel="stylesheet" href="style.css" />
 </head>
 <body>
+    <!-- ==================== DEMO MODE BANNER ==================== -->
+    <div id="api-status-banner" class="demo-banner" style="display:none;">
+        <i class="fas fa-flask"></i>
+        <span id="demo-banner-text">Demo Mode: Using realistic mock data</span>
+        <span style="font-size:10px;opacity:0.7;margin-left:8px;">
+            <a href="#" onclick="document.getElementById('admin-tab')?.click(); return false;" style="color:#ffa500;text-decoration:underline;">
+                Add API Keys
+            </a>
+        </span>
+    </div>
+
     <div id="app">
         <!-- ==================== SIDEBAR ==================== -->
         <div id="sidebar" class="glass">
@@ -36,7 +47,7 @@
                     <i class="fas fa-cloud-sun"></i>
                     <span>Weather</span>
                 </button>
-                <button class="nav-btn" data-page="admin" title="Admin">
+                <button class="nav-btn" data-page="admin" title="Admin" id="admin-tab">
                     <i class="fas fa-cog"></i>
                     <span>Admin</span>
                 </button>
@@ -94,7 +105,7 @@
                             </div>
                         </div>
                     </div>
-
+                    
                     <div class="widget glass" id="ice-widget">
                         <div class="widget-header">
                             <i class="fas fa-snowflake"></i>
@@ -235,11 +246,23 @@
                 <div class="admin-panel glass">
                     <h2><i class="fas fa-cog"></i> Admin Panel</h2>
                     
+                    <!-- ===== API STATUS DISPLAY ===== -->
+                    <div class="admin-section">
+                        <h3>🔑 API Status</h3>
+                        <div id="api-status-display" class="api-status-grid"></div>
+                        <p style="font-size:11px;color:var(--text-muted);margin-top:8px;">
+                            <i class="fas fa-info-circle"></i> 
+                            Leave API keys blank to use <strong>DEMO DATA</strong>
+                        </p>
+                    </div>
+                    
+                    <!-- ===== API KEYS SECTION ===== -->
                     <div class="admin-section">
                         <h3>API Keys</h3>
                         <div id="api-keys-container"></div>
                     </div>
                     
+                    <!-- ===== AI CONFIGURATION ===== -->
                     <div class="admin-section">
                         <h3>AI Configuration</h3>
                         <div class="admin-row">
@@ -259,6 +282,7 @@
                         </div>
                     </div>
                     
+                    <!-- ===== SYSTEM STATUS ===== -->
                     <div class="admin-section">
                         <h3>System Status</h3>
                         <div id="system-status"></div>
@@ -292,8 +316,14 @@
     </div>
 
     <!-- ==================== SCRIPTS ==================== -->
+    <!-- 1. External Libraries -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <!-- 2. API Manager (NEW - Must load before app.js) -->
+    <script src="api-manager.js"></script>
+
+    <!-- 3. Main App -->
     <script src="app.js"></script>
 </body>
 </html>

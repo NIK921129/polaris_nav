@@ -39,6 +39,29 @@ async function getAIResponse(prompt) {
     console.log(`🤖 AI (${data.source}):`, data);
     return data;
 }
+// Add to app.js
+function showAPIStatus() {
+    const status = API.apiStatus;
+    const available = Object.keys(status).filter(k => status[k]);
+    const missing = Object.keys(status).filter(k => !status[k]);
+    
+    console.log(`✅ Available APIs: ${available.length}/${Object.keys(status).length}`);
+    console.log(`❌ Missing APIs: ${missing.join(', ')}`);
+    
+    // Display in UI
+    const statusDiv = document.getElementById('api-status');
+    if (statusDiv) {
+        statusDiv.innerHTML = `
+            <div style="display:flex;gap:8px;flex-wrap:wrap;font-size:11px;">
+                ${Object.keys(status).map(key => `
+                    <span style="padding:2px 8px;border-radius:4px;background:${status[key] ? 'rgba(0,255,136,0.1)' : 'rgba(255,0,102,0.1)'};color:${status[key] ? '#00ff88' : '#ff0066'};">
+                        ${key} ${status[key] ? '✅' : '❌'}
+                    </span>
+                `).join('')}
+            </div>
+        `;
+    }
+}
 
 // Hazards
 async function getHazards(lat, lng) {
@@ -93,7 +116,20 @@ Provide route recommendation.`,
     iceThreshold: 30,
     windThreshold: 20
 };
+// Add to app.js after API loads
+function showDemoBanner() {
+    const banner = document.getElementById('api-status-banner');
+    if (API.isDemoMode()) {
+        banner.style.display = 'flex';
+        console.log('🎭 Running in DEMO MODE - Using realistic mock data');
+    } else {
+        banner.style.display = 'none';
+        console.log('🔴 Running in LIVE MODE - Using real API data');
+    }
+}
 
+// Call this after initialization
+showDemoBanner();
 // Application State
 const STATE = {
     position: { lat: -70.0, lng: 0.0 },
