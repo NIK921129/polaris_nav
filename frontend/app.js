@@ -207,7 +207,7 @@ const Utils = {
 // ============================================================
 // 3. API INTEGRATION LAYER
 // ============================================================
-
+const API_BASE_URL = 'https://polarisnav.onrender.com/api';
 const API = {
     // Generic API caller with retry
     call: async (service, endpoint, params = {}, method = 'GET') => {
