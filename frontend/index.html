@@ -14,7 +14,7 @@
     <!-- ==================== DEMO MODE BANNER ==================== -->
     <div id="api-status-banner" class="demo-banner" style="display:none;">
         <i class="fas fa-flask"></i>
-        <span id="demo-banner-text">Demo Mode: Using realistic mock data</span>
+        <span id="demo-banner-text">🎭 Demo Mode: Using realistic mock data</span>
         <span style="font-size:10px;opacity:0.7;margin-left:8px;">
             <a href="#" onclick="document.getElementById('admin-tab')?.click(); return false;" style="color:#ffa500;text-decoration:underline;">
                 Add API Keys
@@ -65,22 +65,22 @@
             
             <!-- Map Controls Overlay -->
             <div id="map-controls" class="glass">
-                <button onclick="mapManager.zoomIn()" title="Zoom In">
+                <button onclick="window.zoomIn?.()" title="Zoom In">
                     <i class="fas fa-plus"></i>
                 </button>
-                <button onclick="mapManager.zoomOut()" title="Zoom Out">
+                <button onclick="window.zoomOut?.()" title="Zoom Out">
                     <i class="fas fa-minus"></i>
                 </button>
-                <button onclick="mapManager.centerOnVessel()" title="Center on Vessel">
+                <button onclick="window.centerOnVessel?.()" title="Center on Vessel">
                     <i class="fas fa-location-dot"></i>
                 </button>
-                <button onclick="mapManager.toggleLayer('ice')" title="Toggle Ice Layer">
+                <button onclick="window.toggleLayer?.('ice')" title="Toggle Ice Layer">
                     <i class="fas fa-snowflake"></i>
                 </button>
-                <button onclick="mapManager.toggleLayer('hazards')" title="Toggle Hazards">
+                <button onclick="window.toggleLayer?.('hazards')" title="Toggle Hazards">
                     <i class="fas fa-triangle-exclamation"></i>
                 </button>
-                <button onclick="mapManager.toggleLayer('weather')" title="Toggle Weather">
+                <button onclick="window.toggleLayer?.('weather')" title="Toggle Weather">
                     <i class="fas fa-wind"></i>
                 </button>
             </div>
@@ -154,15 +154,15 @@
                     <div class="route-inputs">
                         <div class="input-group">
                             <label>Start Location</label>
-                            <input type="text" id="route-start" placeholder="Enter coordinates or click on map" />
-                            <button onclick="routeManager.setStart()" class="btn-secondary">
+                            <input type="text" id="route-start" placeholder="e.g., -70, 0" />
+                            <button onclick="window.setStart?.()" class="btn-secondary">
                                 <i class="fas fa-location-dot"></i> Set
                             </button>
                         </div>
                         <div class="input-group">
                             <label>End Location</label>
-                            <input type="text" id="route-end" placeholder="Enter coordinates or click on map" />
-                            <button onclick="routeManager.setEnd()" class="btn-secondary">
+                            <input type="text" id="route-end" placeholder="e.g., -65, -60" />
+                            <button onclick="window.setEnd?.()" class="btn-secondary">
                                 <i class="fas fa-location-dot"></i> Set
                             </button>
                         </div>
@@ -174,7 +174,7 @@
                                 <option value="cargo">Cargo Ship</option>
                             </select>
                         </div>
-                        <button onclick="routeManager.optimize()" class="btn-primary">
+                        <button onclick="window.optimizeRoute?.()" class="btn-primary">
                             <i class="fas fa-route"></i> Optimize Route
                         </button>
                     </div>
@@ -190,7 +190,7 @@
                         <div id="camera-view">
                             <video id="camera-stream" autoplay playsinline></video>
                             <div id="camera-overlay">
-                                <button onclick="cameraManager.capture()" class="btn-capture">
+                                <button onclick="window.capture?.()" class="btn-capture">
                                     <i class="fas fa-circle"></i>
                                 </button>
                             </div>
@@ -198,16 +198,16 @@
                         <div id="camera-preview"></div>
                     </div>
                     <div class="camera-controls">
-                        <button onclick="cameraManager.init()" class="btn-secondary">
+                        <button onclick="window.initCamera?.()" class="btn-secondary">
                             <i class="fas fa-play"></i> Start Camera
                         </button>
-                        <button onclick="cameraManager.switchCamera()" class="btn-secondary">
+                        <button onclick="window.switchCamera?.()" class="btn-secondary">
                             <i class="fas fa-rotate"></i> Switch
                         </button>
-                        <button onclick="cameraManager.uploadImage()" class="btn-secondary">
+                        <button onclick="window.uploadImage?.()" class="btn-secondary">
                             <i class="fas fa-upload"></i> Upload
                         </button>
-                        <button onclick="cameraManager.analyze()" class="btn-primary">
+                        <button onclick="window.analyzeImage?.()" class="btn-primary">
                             <i class="fas fa-robot"></i> Analyze
                         </button>
                     </div>
@@ -249,7 +249,7 @@
                     <!-- ===== API STATUS DISPLAY ===== -->
                     <div class="admin-section">
                         <h3>🔑 API Status</h3>
-                        <div id="api-status-display" class="api-status-grid"></div>
+                        <div id="api-status" class="api-status-grid"></div>
                         <p style="font-size:11px;color:var(--text-muted);margin-top:8px;">
                             <i class="fas fa-info-circle"></i> 
                             Leave API keys blank to use <strong>DEMO DATA</strong>
@@ -276,7 +276,7 @@
                         <div class="admin-row">
                             <label>Prompt Template</label>
                             <textarea id="prompt-template" rows="6"></textarea>
-                            <button onclick="adminManager.savePrompt()" class="btn-primary">
+                            <button onclick="window.savePrompt?.()" class="btn-primary">
                                 <i class="fas fa-save"></i> Save Prompt
                             </button>
                         </div>
@@ -304,7 +304,7 @@
                 <div id="chat-messages"></div>
                 <div class="chat-input">
                     <input type="text" id="user-input" placeholder="Ask about navigation..." />
-                    <button onclick="aiManager.sendMessage()" id="send-btn">
+                    <button onclick="window.sendMessage?.()" id="send-btn">
                         <i class="fas fa-paper-plane"></i>
                     </button>
                 </div>
@@ -320,10 +320,7 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-    <!-- 2. API Manager (NEW - Must load before app.js) -->
-    <script src="api-manager.js"></script>
-
-    <!-- 3. Main App -->
+    <!-- 2. Main App -->
     <script src="app.js"></script>
 </body>
 </html>
