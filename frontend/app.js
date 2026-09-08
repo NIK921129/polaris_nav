@@ -1,75 +1,4 @@
 // ============================================================
-// IMPORT API MANAGER
-// ============================================================
-// Make sure api-manager.js is loaded before app.js
-// In index.html, load in this order:
-// <script src="api-manager.js"></script>
-// <script src="app.js"></script>
-
-// ============================================================
-// UPDATE API CALLS TO USE THE MANAGER
-// ============================================================
-
-// Replace existing API calls with these:
-
-// Weather
-async function getWeather(lat, lng) {
-    const data = await API.getWeather(lat, lng);
-    console.log(`🌤️ Weather (${data.source}):`, data);
-    return data;
-}
-
-// Ice
-async function getIce(lat, lng) {
-    const data = await API.getIceConcentration(lat, lng);
-    console.log(`❄️ Ice (${data.source}):`, data);
-    return data;
-}
-
-// Route
-async function getRoute(start, end) {
-    const data = await API.getRoute(start, end);
-    console.log(`🚢 Route (${data.source}):`, data);
-    return data;
-}
-
-// AI
-async function getAIResponse(prompt) {
-    const data = await API.getAIResponse(prompt);
-    console.log(`🤖 AI (${data.source}):`, data);
-    return data;
-}
-// Add to app.js
-function showAPIStatus() {
-    const status = API.apiStatus;
-    const available = Object.keys(status).filter(k => status[k]);
-    const missing = Object.keys(status).filter(k => !status[k]);
-    
-    console.log(`✅ Available APIs: ${available.length}/${Object.keys(status).length}`);
-    console.log(`❌ Missing APIs: ${missing.join(', ')}`);
-    
-    // Display in UI
-    const statusDiv = document.getElementById('api-status');
-    if (statusDiv) {
-        statusDiv.innerHTML = `
-            <div style="display:flex;gap:8px;flex-wrap:wrap;font-size:11px;">
-                ${Object.keys(status).map(key => `
-                    <span style="padding:2px 8px;border-radius:4px;background:${status[key] ? 'rgba(0,255,136,0.1)' : 'rgba(255,0,102,0.1)'};color:${status[key] ? '#00ff88' : '#ff0066'};">
-                        ${key} ${status[key] ? '✅' : '❌'}
-                    </span>
-                `).join('')}
-            </div>
-        `;
-    }
-}
-
-// Hazards
-async function getHazards(lat, lng) {
-    const data = await API.getHazards(lat, lng);
-    console.log(`⚠️ Hazards (${data.source}):`, data);
-    return data;
-}
-// ============================================================
 // POLARIS NAV - COMPLETE APPLICATION
 // All JavaScript in one file
 // ============================================================
@@ -78,8 +7,14 @@ async function getHazards(lat, lng) {
 // 1. CONFIGURATION & STATE
 // ============================================================
 
+// API Base URL - CHANGE THIS TO YOUR LIVE BACKEND URL
+// For production: https://polarisnav.onrender.com/api
+// For local development: http://localhost:3000/api
+const API_BASE_URL = 'https://polarisnav.onrender.com/api';
+// const API_BASE_URL = 'http://localhost:3000/api';
+
 const CONFIG = {
-    // API Keys (loaded from localStorage or .env)
+    // API Keys (loaded from localStorage)
     apis: {
         // Weather
         openweather: { url: 'https://api.openweathermap.org/data/2.5', key: null },
@@ -116,20 +51,7 @@ Provide route recommendation.`,
     iceThreshold: 30,
     windThreshold: 20
 };
-// Add to app.js after API loads
-function showDemoBanner() {
-    const banner = document.getElementById('api-status-banner');
-    if (API.isDemoMode()) {
-        banner.style.display = 'flex';
-        console.log('🎭 Running in DEMO MODE - Using realistic mock data');
-    } else {
-        banner.style.display = 'none';
-        console.log('🔴 Running in LIVE MODE - Using real API data');
-    }
-}
 
-// Call this after initialization
-showDemoBanner();
 // Application State
 const STATE = {
     position: { lat: -70.0, lng: 0.0 },
@@ -154,6 +76,10 @@ const Utils = {
     // Toast notifications
     toast: (message, type = 'info') => {
         const container = document.getElementById('toast-container');
+        if (!container) {
+            console.log(`🔔 ${type}: ${message}`);
+            return;
+        }
         const toast = document.createElement('div');
         toast.className = `toast ${type}`;
         const icons = { success: 'fa-check-circle', error: 'fa-exclamation-circle', info: 'fa-info-circle' };
@@ -180,7 +106,7 @@ const Utils = {
 
     // Distance between two points (Haversine)
     distance: (p1, p2) => {
-        const R = 6371; // Earth's radius in km
+        const R = 6371;
         const dLat = (p2.lat - p1.lat) * Math.PI / 180;
         const dLng = (p2.lng - p1.lng) * Math.PI / 180;
         const a = Math.sin(dLat/2)**2 + Math.cos(p1.lat * Math.PI/180) * Math.cos(p2.lat * Math.PI/180) * Math.sin(dLng/2)**2;
@@ -205,34 +131,45 @@ const Utils = {
 };
 
 // ============================================================
-// 3. API INTEGRATION LAYER
+// 3. API INTEGRATION LAYER - Using Live Backend
 // ============================================================
-const API_BASE_URL = 'https://polarisnav.onrender.com/api';
+
 const API = {
-    // Generic API caller with retry
-    call: async (service, endpoint, params = {}, method = 'GET') => {
-        const config = CONFIG.apis[service];
-        if (!config || !config.key) {
-            throw new Error(`API key missing for ${service}`);
+    // Generic API caller
+    call: async (endpoint, params = {}, method = 'GET', body = null) => {
+        const url = new URL(`${API_BASE_URL}${endpoint}`);
+        
+        // Add query parameters for GET requests
+        if (method === 'GET' && params) {
+            Object.keys(params).forEach(key => {
+                if (params[key] !== undefined && params[key] !== null) {
+                    url.searchParams.append(key, params[key]);
+                }
+            });
         }
 
-        const url = `${config.url}${endpoint}`;
-        const headers = {
-            'Authorization': `Bearer ${config.key}`,
-            'Content-Type': 'application/json'
-        };
-
         try {
-            const response = await fetch(url, {
+            const options = {
                 method,
-                headers,
-                ...(method === 'POST' ? { body: JSON.stringify(params) } : {})
-            });
-            if (!response.ok) throw new Error(`HTTP ${response.status}`);
-            return await response.json();
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                ...(method === 'POST' && body ? { body: JSON.stringify(body) } : {})
+            };
+
+            const response = await fetch(url.toString(), options);
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            
+            const data = await response.json();
+            data._source = 'api';
+            return data;
         } catch (error) {
-            console.error(`API call failed (${service}):`, error);
-            throw error;
+            console.warn(`⚠️ API call failed (${endpoint}):`, error.message);
+            // Return null so callers can fall back to mock data
+            return null;
         }
     },
 
@@ -240,34 +177,50 @@ const API = {
     weather: {
         getCurrent: async (lat, lng) => {
             try {
-                const data = await API.call('openweather', '/weather', { lat, lng, units: 'metric' });
-                return {
-                    temp: data.main.temp,
-                    feelsLike: data.main.feels_like,
-                    humidity: data.main.humidity,
-                    windSpeed: data.wind.speed,
-                    windDeg: data.wind.deg,
-                    description: data.weather[0].description,
-                    icon: data.weather[0].icon,
-                    pressure: data.main.pressure
-                };
+                const data = await API.call('/weather/current', { lat, lng });
+                if (data && data.current) {
+                    return {
+                        temp: data.current.temperature || -5,
+                        feelsLike: data.current.feelsLike || -8,
+                        humidity: data.current.humidity || 70,
+                        windSpeed: data.current.windSpeed || 15,
+                        windDeg: data.current.windDirection || 180,
+                        description: data.current.description || 'Partly Cloudy',
+                        pressure: data.current.pressure || 1000,
+                        source: data.current.source || 'api'
+                    };
+                }
+                // Fallback to mock data
+                return this._getMockWeather(lat, lng);
             } catch (e) {
-                console.warn('OpenWeather failed, trying NOAA...');
-                // Fallback to NOAA
-                return { temp: -10, humidity: 80, windSpeed: 15, description: 'Overcast' };
+                console.warn('Weather API failed, using mock data');
+                return this._getMockWeather(lat, lng);
             }
+        },
+
+        _getMockWeather: (lat, lng) => {
+            const conditions = ['Partly Cloudy', 'Overcast', 'Light Snow', 'Clear Skies', 'Foggy'];
+            return {
+                temp: -5 + Math.random() * 10,
+                feelsLike: -8 + Math.random() * 8,
+                humidity: 65 + Math.random() * 25,
+                windSpeed: 10 + Math.random() * 30,
+                windDeg: Math.round(Math.random() * 360),
+                description: conditions[Math.floor(Math.random() * conditions.length)],
+                pressure: 980 + Math.random() * 40,
+                source: 'mock'
+            };
         },
 
         getForecast: async (lat, lng) => {
             try {
-                const data = await API.call('openweather', '/forecast', { lat, lng, units: 'metric' });
-                return data.list.slice(0, 8).map(item => ({
-                    time: item.dt_txt,
-                    temp: item.main.temp,
-                    description: item.weather[0].description,
-                    icon: item.weather[0].icon
-                }));
+                const data = await API.call('/weather/forecast', { lat, lng });
+                if (data && data.forecast) {
+                    return data.forecast;
+                }
+                return [];
             } catch (e) {
+                console.warn('Forecast API failed');
                 return [];
             }
         }
@@ -277,87 +230,180 @@ const API = {
     ice: {
         getConcentration: async (lat, lng, radius = 100) => {
             try {
-                const data = await API.call('nsidc', '/ice-concentration', { lat, lng, radius });
-                return {
-                    concentration: data.concentration || Math.random() * 40,
-                    area: data.area || 'Marginal',
-                    trend: data.trend || 'Stable',
-                    points: data.points || []
-                };
+                const data = await API.call('/ice/concentration', { lat, lng, radius });
+                if (data && data.ice) {
+                    return data.ice;
+                }
+                return this._getMockIce(lat, lng);
             } catch (e) {
-                // Return mock data if API fails
-                return {
-                    concentration: 15 + Math.random() * 30,
-                    area: 'Marginal Ice Zone',
-                    trend: 'Stable',
-                    points: []
-                };
+                console.warn('Ice API failed, using mock data');
+                return this._getMockIce(lat, lng);
             }
+        },
+
+        _getMockIce: (lat, lng) => {
+            const areas = ['Marginal Ice Zone', 'Pack Ice', 'Fast Ice', 'Open Water'];
+            const points = [];
+            for (let i = 0; i < 50; i++) {
+                const pLat = lat + (Math.random() - 0.5) * 4;
+                const pLng = lng + (Math.random() - 0.5) * 4;
+                const conc = Math.max(0, Math.min(80, 40 - Math.sqrt((pLat - lat) ** 2 + (pLng - lng) ** 2) * 10 + Math.random() * 20));
+                points.push([pLat, pLng, conc]);
+            }
+            return {
+                concentration: 15 + Math.random() * 40,
+                area: areas[Math.floor(Math.random() * areas.length)],
+                trend: ['Stable', 'Increasing', 'Decreasing'][Math.floor(Math.random() * 3)],
+                points: points,
+                source: 'mock'
+            };
         },
 
         getSatellite: async (lat, lng) => {
             try {
-                const data = await API.call('nasa', '/planetary/earth/assets', { lat, lon: lng });
-                return data;
+                const data = await API.call('/ice/satellite', { lat, lng });
+                if (data) return data;
+                return { imageUrl: null, date: new Date(), source: 'mock' };
             } catch (e) {
-                return null;
+                return { imageUrl: null, date: new Date(), source: 'mock' };
             }
         }
     },
 
-    // AI APIs
-    ai: {
-        gemini: async (prompt) => {
+    // Hazards API
+    hazards: {
+        getHazards: async (lat, lng, radius = 50) => {
             try {
-                const data = await API.call('gemini', '/models/gemini-pro:generateContent', {
-                    contents: [{ parts: [{ text: prompt }] }]
-                });
-                return data.candidates[0].content.parts[0].text;
+                const data = await API.call('/hazards', { lat, lng, radius });
+                if (data && data.hazards) {
+                    return data.hazards;
+                }
+                return this._getMockHazards(lat, lng);
             } catch (e) {
-                console.warn('Gemini failed:', e);
-                return null;
+                console.warn('Hazards API failed, using mock data');
+                return this._getMockHazards(lat, lng);
             }
         },
 
-        openai: async (prompt) => {
-            try {
-                const data = await API.call('openai', '/chat/completions', {
-                    model: 'gpt-3.5-turbo',
-                    messages: [{ role: 'user', content: prompt }]
+        _getMockHazards: (lat, lng) => {
+            const types = ['iceberg', 'icefield', 'island', 'mountain'];
+            const count = 2 + Math.floor(Math.random() * 4);
+            const hazards = [];
+            for (let i = 0; i < count; i++) {
+                hazards.push({
+                    lat: lat + (Math.random() - 0.5) * 0.6,
+                    lng: lng + (Math.random() - 0.5) * 0.6,
+                    type: types[Math.floor(Math.random() * types.length)],
+                    size: 50 + Math.random() * 900,
+                    confidence: 0.6 + Math.random() * 0.35,
+                    severity: ['low', 'medium', 'high', 'critical'][Math.floor(Math.random() * 4)],
+                    source: 'mock'
                 });
-                return data.choices[0].message.content;
-            } catch (e) {
-                console.warn('OpenAI failed:', e);
-                return null;
             }
+            return hazards;
+        }
+    },
+
+    // Route API
+    route: {
+        optimize: async (start, end, vesselType = 'research') => {
+            try {
+                const data = await API.call('/route/optimize', {}, 'POST', {
+                    start,
+                    end,
+                    vesselType,
+                    name: 'Route ' + new Date().toLocaleDateString()
+                });
+                if (data && data.route) {
+                    return data.route;
+                }
+                return this._getMockRoute(start, end);
+            } catch (e) {
+                console.warn('Route API failed, using mock data');
+                return this._getMockRoute(start, end);
+            }
+        },
+
+        _getMockRoute: (start, end) => {
+            const waypoints = [start];
+            const numPoints = 3 + Math.floor(Math.random() * 3);
+            for (let i = 1; i <= numPoints; i++) {
+                const t = i / (numPoints + 1);
+                waypoints.push({
+                    lat: start.lat + (end.lat - start.lat) * t + (Math.random() - 0.5) * 0.5,
+                    lng: start.lng + (end.lng - start.lng) * t + (Math.random() - 0.5) * 0.5
+                });
+            }
+            waypoints.push(end);
+            return {
+                distance: 200 + Math.random() * 800,
+                duration: 12 + Math.random() * 36,
+                fuelEfficiency: 60 + Math.random() * 35,
+                waypoints: waypoints,
+                source: 'mock'
+            };
+        }
+    },
+
+    // AI Chat API
+    ai: {
+        chat: async (message, context = '') => {
+            try {
+                const data = await API.call('/ai/chat', {}, 'POST', { message, context });
+                if (data && data.response) {
+                    return data.response;
+                }
+                return this._getMockResponse(message);
+            } catch (e) {
+                console.warn('AI API failed, using mock data');
+                return this._getMockResponse(message);
+            }
+        },
+
+        _getMockResponse: (message) => {
+            const responses = [
+                `Based on current ice conditions and wind speeds, I recommend a heading of ${Math.round(Math.random() * 360)}° at ${Math.round(8 + Math.random() * 8)} knots. Keep watch for potential icebergs in the area.`,
+                `The forecast shows improving conditions. Ice concentration is expected to decrease by ${Math.round(5 + Math.random() * 15)}%. Consider adjusting your route.`,
+                `Multiple hazards detected within ${Math.round(20 + Math.random() * 30)} nautical miles. Two icebergs are drifting. Maintain safe distance of 5 NM.`,
+                `Weather advisory: ${['Blizzard', 'High Winds', 'Heavy Snow', 'Freezing Spray'][Math.floor(Math.random() * 4)]} conditions expected. Fuel efficiency is ${Math.round(60 + Math.random() * 35)}%.`
+            ];
+            
+            if (message.toLowerCase().includes('weather')) return responses[3];
+            if (message.toLowerCase().includes('ice')) return responses[0];
+            if (message.toLowerCase().includes('hazard')) return responses[2];
+            return responses[Math.floor(Math.random() * responses.length)];
         },
 
         analyzeImage: async (imageData) => {
             try {
-                const data = await API.call('huggingface', '/models/google/vit-base-patch16-224', imageData);
-                return data;
+                const data = await API.call('/ai/analyze-image', {}, 'POST', { image: imageData });
+                if (data) return data;
+                return { labels: ['iceberg', 'sea ice', 'ocean'], scores: [0.85, 0.72, 0.63] };
             } catch (e) {
-                console.warn('Image analysis failed:', e);
                 return { labels: ['iceberg', 'sea ice', 'ocean'], scores: [0.85, 0.72, 0.63] };
             }
         }
     },
 
-    // Route optimization (using free routing API)
-    route: {
-        optimize: async (start, end, vesselType = 'research') => {
+    // Auth API
+    auth: {
+        register: async (username, email, password) => {
+            return API.call('/auth/register', {}, 'POST', { username, email, password });
+        },
+
+        login: async (email, password) => {
+            return API.call('/auth/login', {}, 'POST', { email, password });
+        },
+
+        getProfile: async (token) => {
             try {
-                // Try Mapbox first
-                const data = await API.call('mapbox', `/directions/v5/mapbox/driving/${start.lng},${start.lat};${end.lng},${end.lat}`);
-                return {
-                    distance: data.routes[0].distance / 1000,
-                    duration: data.routes[0].duration / 3600,
-                    geometry: data.routes[0].geometry,
-                    waypoints: data.waypoints
-                };
+                const response = await fetch(`${API_BASE_URL}/auth/profile`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (!response.ok) throw new Error('Unauthorized');
+                return response.json();
             } catch (e) {
-                // Fallback: generate waypoints along great circle
-                return { distance: 500, duration: 24, waypoints: [{ lat: start.lat, lng: start.lng }, { lat: end.lat, lng: end.lng }] };
+                return null;
             }
         }
     }
@@ -370,13 +416,17 @@ const API = {
 class MapManager {
     constructor() {
         this.map = null;
-        this.layers = { ice: null, hazards: null, route: null, weather: null };
+        this.layers = { ice: null, hazards: null, route: null, weather: null, routeMarkers: null };
         this.markers = [];
-        this.polylines = [];
         this.initMap();
     }
 
     initMap() {
+        if (typeof L === 'undefined') {
+            console.error('Leaflet not loaded!');
+            return;
+        }
+
         this.map = L.map('map', {
             center: [-70.0, 0.0],
             zoom: 5,
@@ -384,12 +434,10 @@ class MapManager {
             attributionControl: false
         });
 
-        // Dark basemap
         L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
             attribution: '&copy; OpenStreetMap, &copy; CartoDB'
         }).addTo(this.map);
 
-        // Handle click events
         this.map.on('click', (e) => this.onMapClick(e));
 
         Utils.toast('🗺️ Map ready! Click to set waypoints.', 'info');
@@ -397,52 +445,50 @@ class MapManager {
 
     onMapClick(e) {
         const { lat, lng } = e.latlng;
-        const coordStr = Utils.formatCoords(lat, lng);
-        Utils.toast(`📍 Selected: ${coordStr}`, 'info');
+        Utils.toast(`📍 Selected: ${Utils.formatCoords(lat, lng)}`, 'info');
 
-        // If route planner is open, add waypoint
         if (STATE.currentPage === 'route') {
             routeManager.addWaypoint(lat, lng);
         }
 
-        // Update position widget
         this.updatePosition(lat, lng);
     }
 
     updatePosition(lat, lng) {
         STATE.position = { lat, lng };
-        document.querySelector('.position-coords').innerHTML = `
-            <span>Lat: ${lat.toFixed(4)}°</span>
-            <span>Lng: ${lng.toFixed(4)}°</span>
-        `;
-        document.querySelector('.position-status').textContent = '📍 Position updated';
+        const posWidget = document.querySelector('.position-coords');
+        if (posWidget) {
+            posWidget.innerHTML = `
+                <span>Lat: ${lat.toFixed(4)}°</span>
+                <span>Lng: ${lng.toFixed(4)}°</span>
+            `;
+        }
+        const statusEl = document.querySelector('.position-status');
+        if (statusEl) statusEl.textContent = '📍 Position updated';
         Utils.save('position', STATE.position);
     }
 
-    zoomIn() {
-        this.map.zoomIn();
-    }
-
-    zoomOut() {
-        this.map.zoomOut();
-    }
+    zoomIn() { this.map?.zoomIn(); }
+    zoomOut() { this.map?.zoomOut(); }
 
     centerOnVessel() {
-        this.map.flyTo([STATE.position.lat, STATE.position.lng], 8);
-        Utils.toast('📍 Centered on vessel', 'info');
+        if (this.map) {
+            this.map.flyTo([STATE.position.lat, STATE.position.lng], 8);
+            Utils.toast('📍 Centered on vessel', 'info');
+        }
     }
 
     toggleLayer(layer) {
-        if (this.layers[layer]) {
-            if (this.map.hasLayer(this.layers[layer])) {
-                this.map.removeLayer(this.layers[layer]);
-                Utils.toast(`❌ ${layer} layer hidden`, 'info');
-            } else {
-                this.map.addLayer(this.layers[layer]);
-                Utils.toast(`✅ ${layer} layer visible`, 'info');
-            }
-        } else {
+        if (!this.layers[layer]) {
             Utils.toast(`⚠️ ${layer} layer not available`, 'error');
+            return;
+        }
+        if (this.map.hasLayer(this.layers[layer])) {
+            this.map.removeLayer(this.layers[layer]);
+            Utils.toast(`❌ ${layer} layer hidden`, 'info');
+        } else {
+            this.map.addLayer(this.layers[layer]);
+            Utils.toast(`✅ ${layer} layer visible`, 'info');
         }
     }
 
@@ -452,7 +498,6 @@ class MapManager {
         }
 
         if (!data || !data.points || data.points.length === 0) {
-            // Generate mock ice data around position
             const points = [];
             for (let i = 0; i < 30; i++) {
                 const lat = STATE.position.lat + (Math.random() - 0.5) * 4;
@@ -462,18 +507,20 @@ class MapManager {
             data = { points };
         }
 
-        this.layers.ice = L.heatLayer(data.points, {
-            radius: 20,
-            blur: 15,
-            maxZoom: 10,
-            gradient: {
-                0.0: 'rgba(0, 240, 255, 0.4)',
-                0.3: 'rgba(0, 240, 255, 0.6)',
-                0.6: 'rgba(124, 58, 237, 0.7)',
-                0.8: 'rgba(255, 0, 102, 0.8)',
-                1.0: 'rgba(255, 0, 102, 0.9)'
-            }
-        }).addTo(this.map);
+        if (typeof L !== 'undefined' && L.heatLayer) {
+            this.layers.ice = L.heatLayer(data.points, {
+                radius: 20,
+                blur: 15,
+                maxZoom: 10,
+                gradient: {
+                    0.0: 'rgba(0, 240, 255, 0.4)',
+                    0.3: 'rgba(0, 240, 255, 0.6)',
+                    0.6: 'rgba(124, 58, 237, 0.7)',
+                    0.8: 'rgba(255, 0, 102, 0.8)',
+                    1.0: 'rgba(255, 0, 102, 0.9)'
+                }
+            }).addTo(this.map);
+        }
     }
 
     updateHazards(hazards) {
@@ -482,11 +529,9 @@ class MapManager {
         }
 
         if (!hazards || hazards.length === 0) {
-            // Mock hazards
             hazards = [
                 { lat: STATE.position.lat + 0.5, lng: STATE.position.lng + 0.3, type: 'iceberg', size: 200 },
-                { lat: STATE.position.lat - 0.7, lng: STATE.position.lng + 0.8, type: 'icefield', size: 5000 },
-                { lat: STATE.position.lat + 0.2, lng: STATE.position.lng - 0.5, type: 'island', size: 3000 }
+                { lat: STATE.position.lat - 0.7, lng: STATE.position.lng + 0.8, type: 'icefield', size: 5000 }
             ];
         }
 
@@ -499,7 +544,7 @@ class MapManager {
             });
 
             return L.marker([hazard.lat, hazard.lng], { icon })
-                .bindPopup(`<b>${hazard.type}</b><br>Size: ${hazard.size}m`);
+                .bindPopup(`<b>${hazard.type}</b><br>Size: ${hazard.size || 'Unknown'}m`);
         });
 
         this.layers.hazards = L.layerGroup(markers).addTo(this.map);
@@ -508,12 +553,13 @@ class MapManager {
     updateRoute(waypoints) {
         if (this.layers.route) {
             this.map.removeLayer(this.layers.route);
+        }
+        if (this.layers.routeMarkers) {
             this.map.removeLayer(this.layers.routeMarkers);
         }
 
         if (!waypoints || waypoints.length < 2) return;
 
-        // Draw route line
         const latlngs = waypoints.map(w => [w.lat, w.lng]);
         this.layers.route = L.polyline(latlngs, {
             color: '#00f0ff',
@@ -523,7 +569,6 @@ class MapManager {
             lineJoin: 'round'
         }).addTo(this.map);
 
-        // Draw waypoint markers
         const markers = waypoints.map((w, i) => {
             const icon = L.divIcon({
                 className: 'waypoint-icon',
@@ -535,20 +580,15 @@ class MapManager {
         });
 
         this.layers.routeMarkers = L.layerGroup(markers).addTo(this.map);
-
-        // Fit map to route
         this.map.fitBounds(latlngs, { padding: [50, 50] });
     }
 
     updateWeather(weather) {
-        // Weather overlay - wind arrows
         if (this.layers.weather) {
             this.map.removeLayer(this.layers.weather);
         }
-
         if (!weather) return;
 
-        // Simple wind direction indicator
         const windArrow = L.divIcon({
             className: 'wind-arrow',
             html: `<div style="transform:rotate(${weather.windDeg || 0}deg);font-size:24px;color:rgba(0,240,255,0.6);">↑</div>`,
@@ -599,6 +639,7 @@ class RouteManager {
 
     setStart() {
         const input = document.getElementById('route-start');
+        if (!input) return;
         const coords = this.parseCoords(input.value);
         if (coords) {
             this.start = coords;
@@ -616,6 +657,7 @@ class RouteManager {
 
     setEnd() {
         const input = document.getElementById('route-end');
+        if (!input) return;
         const coords = this.parseCoords(input.value);
         if (coords) {
             this.end = coords;
@@ -633,8 +675,8 @@ class RouteManager {
     }
 
     parseCoords(input) {
+        if (!input) return null;
         const trimmed = input.trim();
-        // Try format: "lat, lng" or "lat lng"
         const parts = trimmed.split(/[, ]+/).filter(p => p.length > 0);
         if (parts.length >= 2) {
             const lat = parseFloat(parts[0]);
@@ -655,27 +697,24 @@ class RouteManager {
         Utils.toast('🔄 Optimizing route...', 'info');
 
         try {
-            // Combine waypoints
-            const allPoints = [this.start, ...this.waypoints, this.end];
-
-            // Get weather and ice along route
+            // Get weather and ice data
             const weatherData = await API.weather.getCurrent(STATE.position.lat, STATE.position.lng);
             const iceData = await API.ice.getConcentration(STATE.position.lat, STATE.position.lng);
 
-            // Get AI suggestion
+            // Optimize route via API
+            const routeResult = await API.route.optimize(this.start, this.end, CONFIG.vesselType);
+
+            // Generate AI suggestion
             const prompt = CONFIG.promptTemplate
                 .replace('{position}', JSON.stringify(STATE.position))
                 .replace('{ice}', JSON.stringify(iceData))
                 .replace('{weather}', JSON.stringify(weatherData))
                 .replace('{hazards}', JSON.stringify(STATE.hazards));
+            
+            const aiResponse = await API.ai.chat(prompt);
 
-            const aiResponse = await API.ai.gemini(prompt);
-
-            // Calculate route
-            const routeResult = await API.route.optimize(this.start, this.end, CONFIG.vesselType);
-
-            // Generate optimized waypoints with some variation based on conditions
-            const optimizedWaypoints = this.generateOptimizedWaypoints(
+            // Use the waypoints from the route result
+            const optimizedWaypoints = routeResult.waypoints || this.generateOptimizedWaypoints(
                 this.start, this.end, iceData, weatherData
             );
 
@@ -687,26 +726,28 @@ class RouteManager {
 
             // Show results
             const totalDist = Utils.distance(this.start, this.end);
-            const fuelEfficiency = this.calculateFuelEfficiency(iceData, weatherData);
-            const eta = this.calculateETA(totalDist, weatherData);
+            const fuelEfficiency = routeResult.fuelEfficiency || this.calculateFuelEfficiency(iceData, weatherData);
+            const eta = routeResult.duration || this.calculateETA(totalDist, weatherData);
 
             const results = document.getElementById('route-results');
-            results.className = 'route-results show';
-            results.innerHTML = `
-                <div class="route-info">
-                    <p><strong>📏 Total Distance:</strong> ${totalDist.toFixed(1)} km</p>
-                    <p><strong>⛽ Fuel Efficiency:</strong> ${fuelEfficiency}%</p>
-                    <p><strong>🕐 Estimated Arrival:</strong> ${eta} hours</p>
-                    <p><strong>📊 Waypoints:</strong> ${optimizedWaypoints.length}</p>
-                    <hr style="border-color:rgba(255,255,255,0.05);margin:10px 0;">
-                    <p><strong>🤖 AI Analysis:</strong></p>
-                    <p style="font-size:12px;color:var(--text-muted);">${aiResponse || 'Route optimized using standard algorithms'}</p>
-                    <p style="font-size:11px;color:var(--text-muted);margin-top:8px;">
-                        ⚠️ Ice concentration: ${iceData.concentration.toFixed(1)}% | 
-                        Wind: ${weatherData.windSpeed} km/h
-                    </p>
-                </div>
-            `;
+            if (results) {
+                results.className = 'route-results show';
+                results.innerHTML = `
+                    <div class="route-info">
+                        <p><strong>📏 Total Distance:</strong> ${(routeResult.distance || totalDist).toFixed(1)} km</p>
+                        <p><strong>⛽ Fuel Efficiency:</strong> ${fuelEfficiency}%</p>
+                        <p><strong>🕐 Estimated Arrival:</strong> ${typeof eta === 'number' ? eta.toFixed(1) : eta} hours</p>
+                        <p><strong>📊 Waypoints:</strong> ${optimizedWaypoints.length}</p>
+                        <hr style="border-color:rgba(255,255,255,0.05);margin:10px 0;">
+                        <p><strong>🤖 AI Analysis:</strong></p>
+                        <p style="font-size:12px;color:var(--text-muted);">${aiResponse || 'Route optimized using standard algorithms'}</p>
+                        <p style="font-size:11px;color:var(--text-muted);margin-top:8px;">
+                            ⚠️ Ice concentration: ${(iceData.concentration || 0).toFixed(1)}% | 
+                            Wind: ${(weatherData.windSpeed || 0)} km/h
+                        </p>
+                    </div>
+                `;
+            }
 
             Utils.toast('✅ Route optimized successfully!', 'success');
 
@@ -717,19 +758,15 @@ class RouteManager {
     }
 
     generateOptimizedWaypoints(start, end, iceData, weatherData) {
-        // Generate 3-5 waypoints based on conditions
         const numWaypoints = 3 + Math.floor(Math.random() * 3);
         const waypoints = [start];
         const latStep = (end.lat - start.lat) / (numWaypoints + 1);
         const lngStep = (end.lng - start.lng) / (numWaypoints + 1);
 
-        // Add some randomness based on ice/wind to avoid hazards
-        const iceOffset = iceData.concentration / 50; // 0-2 degree offset
-        const windOffset = weatherData.windSpeed / 20; // 0-2 degree offset
+        const iceOffset = (iceData.concentration || 0) / 50;
+        const windOffset = (weatherData.windSpeed || 0) / 20;
 
         for (let i = 1; i <= numWaypoints; i++) {
-            const t = i / (numWaypoints + 1);
-            // Great circle interpolation with offsets
             const lat = start.lat + latStep * i + (Math.random() - 0.5) * iceOffset;
             const lng = start.lng + lngStep * i + (Math.random() - 0.5) * windOffset;
             waypoints.push({ lat, lng });
@@ -739,28 +776,24 @@ class RouteManager {
     }
 
     calculateFuelEfficiency(iceData, weatherData) {
-        let efficiency = 85; // Base efficiency
-        // Ice reduces efficiency
-        efficiency -= iceData.concentration / 3;
-        // Wind affects efficiency (headwind bad, tailwind good)
-        if (weatherData.windDeg) {
-            const windDir = weatherData.windDeg;
-            // If wind is from south/east (headwind for typical routes)
-            if (windDir > 90 && windDir < 270) {
-                efficiency -= weatherData.windSpeed / 5;
-            } else {
-                efficiency += weatherData.windSpeed / 10;
+        let efficiency = 85;
+        if (iceData && iceData.concentration) {
+            efficiency -= iceData.concentration / 3;
+        }
+        if (weatherData && weatherData.windSpeed) {
+            if (weatherData.windSpeed > 20) {
+                efficiency -= (weatherData.windSpeed - 20) * 0.5;
             }
         }
         return Math.max(30, Math.min(100, Math.round(efficiency)));
     }
 
     calculateETA(distance, weatherData) {
-        const baseSpeed = 15; // knots
-        const windFactor = 1 - (weatherData.windSpeed / 100);
+        const baseSpeed = 15;
+        const windFactor = 1 - ((weatherData?.windSpeed || 0) / 100);
         const iceFactor = 1 - (CONFIG.iceThreshold / 100);
-        const speed = baseSpeed * windFactor * iceFactor;
-        return (distance / 1.852 / speed).toFixed(1); // km to nm
+        const speed = baseSpeed * Math.max(0.3, windFactor) * iceFactor;
+        return (distance / 1.852 / speed).toFixed(1);
     }
 }
 
@@ -802,6 +835,7 @@ class AIManager {
 
     async sendMessage() {
         const input = document.getElementById('user-input');
+        if (!input) return;
         const message = input.value.trim();
         if (!message || this.isProcessing) return;
 
@@ -810,12 +844,11 @@ class AIManager {
         this.isProcessing = true;
 
         try {
-            // Build context
             const context = this.buildContext(message);
-            const response = await this.getAIResponse(context);
+            const response = await API.ai.chat(message, context);
 
             if (response) {
-                this.addMessage('ai', response);
+                this.addMessage('ai', this.formatResponse(response));
             } else {
                 this.addMessage('ai', `
                     <p>⚠️ I couldn't process that request.</p>
@@ -850,47 +883,19 @@ class AIManager {
         `;
     }
 
-    async getAIResponse(context) {
-        const prompt = `
-            You are Polaris Nav, an Antarctic navigation expert AI.
-            Respond to this query using the context provided.
-            Be concise, helpful, and safety-focused.
-            
-            Context: ${context}
-            
-            Provide a clear, actionable response.
-        `;
-
-        try {
-            // Try Gemini first
-            let response = await API.ai.gemini(prompt);
-            if (response) return this.formatResponse(response);
-            
-            // Fallback to OpenAI
-            response = await API.ai.openai(prompt);
-            if (response) return this.formatResponse(response);
-            
-            return null;
-        } catch (e) {
-            console.error('AI Fallback:', e);
-            return null;
-        }
-    }
-
     formatResponse(text) {
-        // Convert markdown-style formatting to HTML
+        if (!text) return '<p>No response available.</p>';
         let html = text
             .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
             .replace(/\*(.*?)\*/g, '<em>$1</em>')
             .replace(/\n/g, '<br>')
             .replace(/- (.*?)(<br>|$)/g, '• $1$2');
-        
-        // Split into paragraphs
         return html.split('<br><br>').map(p => `<p>${p}</p>`).join('');
     }
 
     addMessage(type, content) {
         const container = document.getElementById('chat-messages');
+        if (!container) return;
         const div = document.createElement('div');
         div.className = `message ${type}`;
         div.innerHTML = content;
@@ -902,7 +907,6 @@ class AIManager {
     }
 
     saveHistory() {
-        // Keep last 50 messages
         if (this.chatMessages.length > 50) {
             this.chatMessages = this.chatMessages.slice(-50);
         }
@@ -911,6 +915,7 @@ class AIManager {
 
     renderMessages() {
         const container = document.getElementById('chat-messages');
+        if (!container) return;
         container.innerHTML = '';
         this.chatMessages.forEach(msg => {
             const div = document.createElement('div');
@@ -943,16 +948,20 @@ class CameraManager {
             });
 
             const video = document.getElementById('camera-stream');
-            video.srcObject = this.stream;
-            video.className = 'active';
+            if (video) {
+                video.srcObject = this.stream;
+                video.className = 'active';
+            }
             this.isActive = true;
 
-            document.getElementById('camera-overlay').className = 'active';
+            const overlay = document.getElementById('camera-overlay');
+            if (overlay) overlay.className = 'active';
             Utils.toast('📸 Camera started!', 'success');
         } catch (error) {
             console.warn('Camera not available:', error);
             Utils.toast('⚠️ Camera access denied. Use upload instead.', 'error');
-            document.getElementById('file-upload').click();
+            const upload = document.getElementById('file-upload');
+            if (upload) upload.click();
         }
     }
 
@@ -963,6 +972,8 @@ class CameraManager {
         }
 
         const video = document.getElementById('camera-stream');
+        if (!video) return;
+
         const canvas = document.createElement('canvas');
         canvas.width = video.videoWidth || 640;
         canvas.height = video.videoHeight || 480;
@@ -972,8 +983,10 @@ class CameraManager {
         this.currentImage = canvas.toDataURL('image/jpeg');
 
         const preview = document.getElementById('camera-preview');
-        preview.innerHTML = `<img src="${this.currentImage}" alt="Captured">`;
-        preview.className = 'active';
+        if (preview) {
+            preview.innerHTML = `<img src="${this.currentImage}" alt="Captured">`;
+            preview.className = 'active';
+        }
 
         Utils.toast('📸 Image captured!', 'success');
     }
@@ -988,11 +1001,14 @@ class CameraManager {
     }
 
     uploadImage() {
-        document.getElementById('file-upload').click();
+        const upload = document.getElementById('file-upload');
+        if (upload) upload.click();
     }
 
     setupFileUpload() {
-        document.getElementById('file-upload').addEventListener('change', (e) => {
+        const upload = document.getElementById('file-upload');
+        if (!upload) return;
+        upload.addEventListener('change', (e) => {
             const file = e.target.files[0];
             if (!file) return;
 
@@ -1000,8 +1016,10 @@ class CameraManager {
             reader.onload = (event) => {
                 this.currentImage = event.target.result;
                 const preview = document.getElementById('camera-preview');
-                preview.innerHTML = `<img src="${this.currentImage}" alt="Uploaded">`;
-                preview.className = 'active';
+                if (preview) {
+                    preview.innerHTML = `<img src="${this.currentImage}" alt="Uploaded">`;
+                    preview.className = 'active';
+                }
                 Utils.toast('📤 Image uploaded!', 'success');
             };
             reader.readAsDataURL(file);
@@ -1017,23 +1035,19 @@ class CameraManager {
         Utils.toast('🤖 Analyzing image...', 'info');
 
         try {
-            // Convert base64 to blob for API
-            const response = await fetch(this.currentImage);
-            const blob = await response.blob();
-
-            // Use AI for analysis
-            const analysis = await API.ai.analyzeImage(blob);
+            const analysis = await API.ai.analyzeImage(this.currentImage);
 
             const results = document.getElementById('analysis-results');
-            results.className = 'analysis-results show';
-            results.innerHTML = `
-                <h4>🔍 Analysis Results</h4>
-                <div class="analysis-content">
-                    ${this.formatAnalysis(analysis)}
-                </div>
-            `;
+            if (results) {
+                results.className = 'analysis-results show';
+                results.innerHTML = `
+                    <h4>🔍 Analysis Results</h4>
+                    <div class="analysis-content">
+                        ${this.formatAnalysis(analysis)}
+                    </div>
+                `;
+            }
 
-            // Check for hazards in image
             const hazards = this.detectHazardsFromImage(analysis);
             if (hazards.length > 0) {
                 hazards.forEach(h => {
@@ -1055,11 +1069,8 @@ class CameraManager {
     }
 
     formatAnalysis(analysis) {
-        if (typeof analysis === 'string') {
-            return analysis;
-        }
-
-        if (analysis.labels && analysis.scores) {
+        if (typeof analysis === 'string') return analysis;
+        if (analysis && analysis.labels && analysis.scores) {
             return `
                 <p><strong>Detected Objects:</strong></p>
                 <ul>
@@ -1069,31 +1080,24 @@ class CameraManager {
                 </ul>
             `;
         }
-
         return `<p>Analysis complete. No significant hazards detected.</p>`;
     }
 
     detectHazardsFromImage(analysis) {
         const hazards = [];
         const hazardKeywords = ['iceberg', 'ice', 'snow', 'glacier', 'island', 'mountain'];
-
-        if (analysis.labels) {
+        if (analysis && analysis.labels) {
             analysis.labels.forEach((label, i) => {
                 const confidence = analysis.scores[i] || 0;
                 if (confidence > 0.6) {
                     hazardKeywords.forEach(keyword => {
                         if (label.toLowerCase().includes(keyword)) {
-                            hazards.push({
-                                type: keyword,
-                                confidence: confidence,
-                                detectedAt: new Date().toISOString()
-                            });
+                            hazards.push({ type: keyword, confidence: confidence });
                         }
                     });
                 }
             });
         }
-
         return hazards;
     }
 }
@@ -1112,6 +1116,7 @@ class AdminManager {
 
     initAPIKeys() {
         const container = document.getElementById('api-keys-container');
+        if (!container) return;
         container.innerHTML = Object.keys(CONFIG.apis).map(key => `
             <div class="api-key-row">
                 <label>${key.toUpperCase()}</label>
@@ -1176,6 +1181,7 @@ class AdminManager {
     loadPrompt() {
         const saved = Utils.load('promptTemplate');
         const textarea = document.getElementById('prompt-template');
+        if (!textarea) return;
         if (saved) {
             CONFIG.promptTemplate = saved;
             textarea.value = saved;
@@ -1186,6 +1192,7 @@ class AdminManager {
 
     savePrompt() {
         const textarea = document.getElementById('prompt-template');
+        if (!textarea) return;
         const value = textarea.value.trim();
         if (!value) {
             Utils.toast('⚠️ Please enter a prompt template', 'error');
@@ -1199,6 +1206,7 @@ class AdminManager {
 
     updateStatus() {
         const container = document.getElementById('system-status');
+        if (!container) return;
         const total = Object.keys(CONFIG.apis).length;
         const configured = Object.values(CONFIG.apis).filter(a => a.key).length;
 
@@ -1263,6 +1271,9 @@ class DataPoller {
             STATE.iceData = await API.ice.getConcentration(pos.lat, pos.lng);
             this.updateIceUI(STATE.iceData);
 
+            // Get hazards
+            STATE.hazards = await API.hazards.getHazards(pos.lat, pos.lng);
+
             // Update map layers
             mapManager.updateIceLayer(STATE.iceData);
             mapManager.updateWeather(STATE.weather);
@@ -1281,15 +1292,19 @@ class DataPoller {
 
         const widget = document.getElementById('weather-widget');
         if (widget) {
-            widget.querySelector('.weather-temp').textContent = `${Math.round(weather.temp)}°C`;
-            widget.querySelector('.weather-desc').textContent = weather.description || 'Clear';
-            widget.querySelector('.weather-details').innerHTML = `
-                <span><i class="fas fa-wind"></i> ${Math.round(weather.windSpeed)} km/h</span>
-                <span><i class="fas fa-tint"></i> ${weather.humidity}%</span>
-            `;
+            const tempEl = widget.querySelector('.weather-temp');
+            const descEl = widget.querySelector('.weather-desc');
+            const detailsEl = widget.querySelector('.weather-details');
+            if (tempEl) tempEl.textContent = `${Math.round(weather.temp)}°C`;
+            if (descEl) descEl.textContent = weather.description || 'Clear';
+            if (detailsEl) {
+                detailsEl.innerHTML = `
+                    <span><i class="fas fa-wind"></i> ${Math.round(weather.windSpeed)} km/h</span>
+                    <span><i class="fas fa-tint"></i> ${weather.humidity}%</span>
+                `;
+            }
         }
 
-        // Update weather page
         const currentWeather = document.getElementById('current-weather');
         if (currentWeather) {
             currentWeather.innerHTML = `
@@ -1298,7 +1313,7 @@ class DataPoller {
                 <div style="margin-top:8px;font-size:13px;color:var(--text-muted);">
                     <div>Wind: ${Math.round(weather.windSpeed)} km/h</div>
                     <div>Humidity: ${weather.humidity}%</div>
-                    <div>Pressure: ${weather.pressure} hPa</div>
+                    <div>Pressure: ${weather.pressure || '--'} hPa</div>
                 </div>
             `;
         }
@@ -1310,9 +1325,12 @@ class DataPoller {
         const widget = document.getElementById('ice-widget');
         if (widget) {
             const percentage = Math.round(ice.concentration || 0);
-            widget.querySelector('.ice-percentage').textContent = `${percentage}%`;
-            widget.querySelector('.ice-status').textContent = ice.area || 'Unknown';
-            widget.querySelector('.ice-progress-bar').style.width = `${Math.min(percentage, 100)}%`;
+            const percentEl = widget.querySelector('.ice-percentage');
+            const statusEl = widget.querySelector('.ice-status');
+            const barEl = widget.querySelector('.ice-progress-bar');
+            if (percentEl) percentEl.textContent = `${percentage}%`;
+            if (statusEl) statusEl.textContent = ice.area || 'Unknown';
+            if (barEl) barEl.style.width = `${Math.min(percentage, 100)}%`;
         }
     }
 }
@@ -1339,31 +1357,46 @@ class App {
         this.setupNavigation();
 
         // Setup chat input
-        document.getElementById('user-input').addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') aiManager.sendMessage();
-        });
+        const chatInput = document.getElementById('user-input');
+        if (chatInput) {
+            chatInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') aiManager.sendMessage();
+            });
+        }
 
         // Setup chat toggle
-        document.querySelector('.chat-header').addEventListener('click', (e) => {
-            if (e.target.closest('.chat-toggle')) return;
-            document.getElementById('ai-chat').classList.toggle('minimized');
-        });
+        const chatHeader = document.querySelector('.chat-header');
+        if (chatHeader) {
+            chatHeader.addEventListener('click', (e) => {
+                if (e.target.closest('.chat-toggle')) return;
+                const chat = document.getElementById('ai-chat');
+                if (chat) chat.classList.toggle('minimized');
+            });
+        }
 
-        // Setup chat toggle button
-        document.querySelector('.chat-toggle').addEventListener('click', (e) => {
-            e.stopPropagation();
-            document.getElementById('ai-chat').classList.toggle('minimized');
-            const icon = e.target;
-            icon.className = document.getElementById('ai-chat').classList.contains('minimized') 
-                ? 'fas fa-chevron-up' 
-                : 'fas fa-chevron-down';
-        });
+        const chatToggle = document.querySelector('.chat-toggle');
+        if (chatToggle) {
+            chatToggle.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const chat = document.getElementById('ai-chat');
+                if (chat) chat.classList.toggle('minimized');
+                const icon = e.target;
+                if (icon) {
+                    icon.className = chat?.classList.contains('minimized') 
+                        ? 'fas fa-chevron-up' 
+                        : 'fas fa-chevron-down';
+                }
+            });
+        }
 
         // Get initial position
         this.getPosition();
 
         // Load saved state
         this.loadState();
+
+        // Show API status
+        this.showAPIStatus();
 
         Utils.toast('❄️ Polaris Nav ready!', 'success');
     }
@@ -1380,24 +1413,21 @@ class App {
     navigateTo(page) {
         STATE.currentPage = page;
 
-        // Update buttons
         document.querySelectorAll('.nav-btn').forEach(btn => {
             btn.classList.toggle('active', btn.dataset.page === page);
         });
 
-        // Update pages
         document.querySelectorAll('.page').forEach(p => {
             p.classList.toggle('active', p.id === `page-${page}`);
         });
 
-        // Special actions per page
         if (page === 'camera') {
             cameraManager.init();
         }
 
         if (page === 'route') {
-            // Show route panel
-            document.getElementById('route-results').className = 'route-results';
+            const results = document.getElementById('route-results');
+            if (results) results.className = 'route-results';
         }
 
         if (page === 'admin') {
@@ -1439,15 +1469,37 @@ class App {
             mapManager.updateRoute(savedRoute);
         }
     }
+
+    showAPIStatus() {
+        const statusDiv = document.getElementById('api-status');
+        if (!statusDiv) return;
+        
+        const services = Object.keys(CONFIG.apis);
+        const available = services.filter(key => CONFIG.apis[key].key);
+        const missing = services.filter(key => !CONFIG.apis[key].key);
+        
+        statusDiv.innerHTML = `
+            <div style="display:flex;gap:8px;flex-wrap:wrap;font-size:11px;margin-top:8px;">
+                <div style="width:100%;font-size:12px;color:var(--text-secondary);margin-bottom:4px;">
+                    📊 ${available.length}/${services.length} API keys configured
+                    ${available.length === 0 ? ' - Using MOCK DATA' : ''}
+                </div>
+                ${services.map(key => `
+                    <span style="padding:2px 8px;border-radius:4px;background:${CONFIG.apis[key].key ? 'rgba(0,255,136,0.1)' : 'rgba(255,165,0,0.1)'};color:${CONFIG.apis[key].key ? '#00ff88' : '#ffa500'};">
+                        ${key} ${CONFIG.apis[key].key ? '✅' : '🎭'}
+                    </span>
+                `).join('')}
+            </div>
+        `;
+    }
 }
 
 // ============================================================
 // 11. INITIALIZE APP
 // ============================================================
 
-// Wait for DOM to be ready
 document.addEventListener('DOMContentLoaded', () => {
-    // Add required CSS for map controls that aren't in main CSS
+    // Add required CSS
     const style = document.createElement('style');
     style.textContent = `
         .hazard-icon div {
@@ -1495,33 +1547,30 @@ document.addEventListener('DOMContentLoaded', () => {
     `;
     document.head.appendChild(style);
 
-    // Initialize app
     window.app = new App();
 });
 
 // ============================================================
-// 12. EXPOSE GLOBALS (for inline onclick handlers)
+// 12. EXPOSE GLOBALS
 // ============================================================
 
-// These are already exposed via window.* assignments above
-// Additional helpers for HTML attributes
-
-window.zoomIn = () => mapManager.zoomIn();
-window.zoomOut = () => mapManager.zoomOut();
-window.centerOnVessel = () => mapManager.centerOnVessel();
-window.toggleLayer = (layer) => mapManager.toggleLayer(layer);
-window.sendMessage = () => aiManager.sendMessage();
-window.capture = () => cameraManager.capture();
-window.analyzeImage = () => cameraManager.analyze();
-window.uploadImage = () => cameraManager.uploadImage();
-window.saveAPIKey = (key) => adminManager.saveKey(key);
-window.testAPIKey = (key) => adminManager.testKey(key);
-window.savePrompt = () => adminManager.savePrompt();
-window.optimizeRoute = () => routeManager.optimize();
-window.setStart = () => routeManager.setStart();
-window.setEnd = () => routeManager.setEnd();
+window.zoomIn = () => mapManager?.zoomIn();
+window.zoomOut = () => mapManager?.zoomOut();
+window.centerOnVessel = () => mapManager?.centerOnVessel();
+window.toggleLayer = (layer) => mapManager?.toggleLayer(layer);
+window.sendMessage = () => aiManager?.sendMessage();
+window.capture = () => cameraManager?.capture();
+window.analyzeImage = () => cameraManager?.analyze();
+window.uploadImage = () => cameraManager?.uploadImage();
+window.saveAPIKey = (key) => adminManager?.saveKey(key);
+window.testAPIKey = (key) => adminManager?.testKey(key);
+window.savePrompt = () => adminManager?.savePrompt();
+window.optimizeRoute = () => routeManager?.optimize();
+window.setStart = () => routeManager?.setStart();
+window.setEnd = () => routeManager?.setEnd();
 
 console.log('❄️ Polaris Nav loaded successfully!');
 console.log(`📊 API Services: ${Object.values(CONFIG.apis).filter(a => a.key).length}/${Object.keys(CONFIG.apis).length} configured`);
 console.log(`🤖 AI Model: ${CONFIG.aiModel}`);
 console.log(`📍 Current Position: ${STATE.position.lat.toFixed(4)}, ${STATE.position.lng.toFixed(4)}`);
+console.log(`🌐 Backend URL: ${API_BASE_URL}`);
