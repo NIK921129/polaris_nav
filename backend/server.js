@@ -1065,7 +1065,25 @@ app.post('/api/auth/register', AuthController.register);
 app.post('/api/auth/login', AuthController.login);
 app.get('/api/auth/profile', authenticate, AuthController.getProfile);
 app.put('/api/auth/preferences', authenticate, AuthController.updatePreferences);
-
+// Add this after your other routes
+app.get('/', (req, res) => {
+    res.json({
+        name: 'Polaris Nav API',
+        version: '1.0.0',
+        status: 'online',
+        endpoints: {
+            health: '/api/health',
+            weather: '/api/weather/current?lat=-70&lng=0',
+            forecast: '/api/weather/forecast?lat=-70&lng=0',
+            ice: '/api/ice/concentration?lat=-70&lng=0',
+            icebergs: '/api/ice/icebergs?lat=-70&lng=0',
+            hazards: '/api/hazards?lat=-70&lng=0',
+            route: '/api/route/optimize (POST)',
+            chat: '/api/ai/chat (POST)',
+            auth: '/api/auth/register, /api/auth/login'
+        }
+    });
+});
 // Admin routes
 app.get('/api/admin/stats', authenticate, authorize('admin'), AdminController.getStats);
 
