@@ -1084,6 +1084,369 @@ app.get('/', (req, res) => {
         }
     });
 });
+// Add this after your other routes
+app.get('/api/weather/current', (req, res) => {
+    const { lat, lng } = req.query;
+    if (!lat || !lng) {
+        return res.status(400).json({ error: 'Latitude and longitude required' });
+    }
+    res.json({
+        current: {
+            temperature: -5 + Math.random() * 10,
+            windSpeed: 10 + Math.random() * 30,
+            description: ['Partly Cloudy', 'Snow', 'Clear', 'Overcast'][Math.floor(Math.random() * 4)],
+            humidity: 65 + Math.random() * 25,
+            source: 'mock'
+        },
+        timestamp: new Date().toISOString()
+    });
+});
+
+app.get('/api/ice/concentration', (req, res) => {
+    const { lat, lng } = req.query;
+    if (!lat || !lng) {
+        return res.status(400).json({ error: 'Latitude and longitude required' });
+    }
+    res.json({
+        ice: {
+            concentration: 15 + Math.random() * 40,
+            area: ['Marginal Ice Zone', 'Pack Ice', 'Fast Ice', 'Open Water'][Math.floor(Math.random() * 4)],
+            trend: ['Stable', 'Increasing', 'Decreasing'][Math.floor(Math.random() * 3)],
+            points: [],
+            source: 'mock'
+        },
+        timestamp: new Date().toISOString()
+    });
+});
+// ============================================================
+// ICE API ROUTES - ADD THIS
+// ============================================================
+app.get('/api/ice/concentration', (req, res) => {
+    try {
+        const { lat, lng, radius = 100 } = req.query;
+        if (!lat || !lng) {
+            return res.status(400).json({ error: 'Latitude and longitude required' });
+        }
+
+        // Generate realistic ice data
+        const points = [];
+        for (let i = 0; i < 50; i++) {
+            const pLat = parseFloat(lat) + (Math.random() - 0.5) * 4;
+            const pLng = parseFloat(lng) + (Math.random() - 0.5) * 4;
+            const dist = Math.sqrt((pLat - parseFloat(lat)) ** 2 + (pLng - parseFloat(lng)) ** 2);
+            const conc = Math.max(0, Math.min(80, 40 - dist * 10 + Math.random() * 20));
+            points.push([pLat, pLng, conc]);
+        }
+
+        const areas = ['Marginal Ice Zone', 'Pack Ice', 'Fast Ice', 'Open Water'];
+        const trends = ['Stable', 'Increasing', 'Decreasing'];
+
+        res.json({
+            ice: {
+                concentration: 15 + Math.random() * 40,
+                area: areas[Math.floor(Math.random() * areas.length)],
+                trend: trends[Math.floor(Math.random() * trends.length)],
+                thickness: 0.5 + Math.random() * 2,
+                age: ['First Year', 'Multi-Year', 'Young Ice'][Math.floor(Math.random() * 3)],
+                points: points,
+                source: 'mock'
+            },
+            timestamp: new Date().toISOString()
+        });
+    } catch (error) {
+        console.error('Ice API error:', error);
+        res.status(500).json({ error: 'Failed to get ice data' });
+    }
+});
+
+// ============================================================
+// ICEBERGS API - ADD THIS
+// ============================================================
+app.get('/api/ice/icebergs', (req, res) => {
+    try {
+        const { lat, lng, radius = 50 } = req.query;
+        if (!lat || !lng) {
+            return res.status(400).json({ error: 'Latitude and longitude required' });
+        }
+
+        const icebergs = [];
+        const count = Math.floor(Math.random() * 5) + 1;
+        for (let i = 0; i < count; i++) {
+            icebergs.push({
+                id: `iceberg_${i}`,
+                lat: parseFloat(lat) + (Math.random() - 0.5) * 0.8,
+                lng: parseFloat(lng) + (Math.random() - 0.5) * 0.8,
+                size: 50 + Math.random() * 500,
+                height: 10 + Math.random() * 40,
+                confidence: 0.6 + Math.random() * 0.35,
+                source: 'mock'
+            });
+        }
+
+        res.json({
+            icebergs: icebergs,
+            count: icebergs.length,
+            timestamp: new Date().toISOString()
+        });
+    } catch (error) {
+        console.error('Icebergs API error:', error);
+        res.status(500).json({ error: 'Failed to detect icebergs' });
+    }
+});
+
+// ============================================================
+// HAZARDS API - ADD THIS
+// ============================================================
+app.get('/api/hazards', (req, res) => {
+    try {
+        const { lat, lng, radius = 50 } = req.query;
+        if (!lat || !lng) {
+            return res.status(400).json({ error: 'Latitude and longitude required' });
+        }
+
+        const types = ['iceberg', 'icefield', 'island', 'mountain'];
+        const hazards = [];
+        const count = 2 + Math.floor(Math.random() * 4);
+        for (let i = 0; i < count; i++) {
+            hazards.push({
+                id: `hazard_${i}`,
+                lat: parseFloat(lat) + (Math.random() - 0.5) * 0.6,
+                lng: parseFloat(lng) + (Math.random() - 0.5) * 0.6,
+                type: types[Math.floor(Math.random() * types.length)],
+                size: 50 + Math.random() * 900,
+                confidence: 0.6 + Math.random() * 0.35,
+                severity: ['low', 'medium', 'high', 'critical'][Math.floor(Math.random() * 4)],
+                source: 'mock'
+            });
+        }
+
+        res.json({
+            hazards: hazards,
+            count: hazards.length,
+            timestamp: new Date().toISOString()
+        });
+    } catch (error) {
+        console.error('Hazards API error:', error);
+        res.status(500).json({ error: 'Failed to get hazards' });
+    }
+});
+// ============================================================
+// ICE API ROUTES - ADD THIS SECTION
+// ============================================================
+
+// Ice Concentration API
+app.get('/api/ice/concentration', (req, res) => {
+    try {
+        const { lat, lng, radius = 100 } = req.query;
+        
+        // Validate parameters
+        if (!lat || !lng) {
+            return res.status(400).json({ 
+                error: 'Latitude and longitude required',
+                example: '/api/ice/concentration?lat=-70&lng=0'
+            });
+        }
+
+        const latNum = parseFloat(lat);
+        const lngNum = parseFloat(lng);
+
+        // Generate realistic ice data points
+        const points = [];
+        for (let i = 0; i < 50; i++) {
+            const pLat = latNum + (Math.random() - 0.5) * 4;
+            const pLng = lngNum + (Math.random() - 0.5) * 4;
+            const dist = Math.sqrt((pLat - latNum) ** 2 + (pLng - lngNum) ** 2);
+            const conc = Math.max(0, Math.min(80, 40 - dist * 10 + Math.random() * 20));
+            points.push([pLat, pLng, conc]);
+        }
+
+        const areas = ['Marginal Ice Zone', 'Pack Ice', 'Fast Ice', 'Open Water', 'Ice Shelf'];
+        const trends = ['Stable', 'Increasing', 'Decreasing'];
+        const ages = ['First Year', 'Multi-Year', 'Young Ice', 'Fast Ice'];
+
+        res.json({
+            ice: {
+                concentration: 15 + Math.random() * 40,
+                area: areas[Math.floor(Math.random() * areas.length)],
+                trend: trends[Math.floor(Math.random() * trends.length)],
+                thickness: 0.5 + Math.random() * 2,
+                age: ages[Math.floor(Math.random() * ages.length)],
+                points: points,
+                source: 'mock'
+            },
+            timestamp: new Date().toISOString()
+        });
+    } catch (error) {
+        console.error('Ice API error:', error);
+        res.status(500).json({ error: 'Failed to get ice data' });
+    }
+});
+
+// Icebergs Detection API
+app.get('/api/ice/icebergs', (req, res) => {
+    try {
+        const { lat, lng, radius = 50 } = req.query;
+        
+        if (!lat || !lng) {
+            return res.status(400).json({ 
+                error: 'Latitude and longitude required' 
+            });
+        }
+
+        const latNum = parseFloat(lat);
+        const lngNum = parseFloat(lng);
+        const icebergs = [];
+        const count = Math.floor(Math.random() * 5) + 1;
+
+        for (let i = 0; i < count; i++) {
+            icebergs.push({
+                id: `iceberg_${i}`,
+                lat: latNum + (Math.random() - 0.5) * 0.8,
+                lng: lngNum + (Math.random() - 0.5) * 0.8,
+                size: 50 + Math.random() * 500,
+                height: 10 + Math.random() * 40,
+                type: ['Tabular', 'Dome', 'Pinnacle', 'Blocky'][Math.floor(Math.random() * 4)],
+                speed: 0.5 + Math.random() * 2,
+                direction: Math.round(Math.random() * 360),
+                confidence: 0.6 + Math.random() * 0.35,
+                detectedAt: new Date().toISOString()
+            });
+        }
+
+        res.json({
+            icebergs: icebergs,
+            count: icebergs.length,
+            timestamp: new Date().toISOString()
+        });
+    } catch (error) {
+        console.error('Icebergs API error:', error);
+        res.status(500).json({ error: 'Failed to detect icebergs' });
+    }
+});
+
+// Hazards Detection API
+app.get('/api/hazards', (req, res) => {
+    try {
+        const { lat, lng, radius = 50 } = req.query;
+        
+        if (!lat || !lng) {
+            return res.status(400).json({ 
+                error: 'Latitude and longitude required' 
+            });
+        }
+
+        const latNum = parseFloat(lat);
+        const lngNum = parseFloat(lng);
+        const types = ['iceberg', 'icefield', 'island', 'mountain', 'ice_shelf'];
+        const hazards = [];
+        const count = 2 + Math.floor(Math.random() * 4);
+
+        for (let i = 0; i < count; i++) {
+            hazards.push({
+                id: `hazard_${i}`,
+                lat: latNum + (Math.random() - 0.5) * 0.6,
+                lng: lngNum + (Math.random() - 0.5) * 0.6,
+                type: types[Math.floor(Math.random() * types.length)],
+                size: 50 + Math.random() * 900,
+                height: 10 + Math.random() * 50,
+                confidence: 0.6 + Math.random() * 0.35,
+                severity: ['low', 'medium', 'high', 'critical'][Math.floor(Math.random() * 4)],
+                status: ['active', 'melting', 'moving', 'stationary'][Math.floor(Math.random() * 4)],
+                detectedAt: new Date().toISOString()
+            });
+        }
+
+        res.json({
+            hazards: hazards,
+            count: hazards.length,
+            timestamp: new Date().toISOString()
+        });
+    } catch (error) {
+        console.error('Hazards API error:', error);
+        res.status(500).json({ error: 'Failed to get hazards' });
+    }
+});
+
+// Route Optimization API
+app.post('/api/route/optimize', (req, res) => {
+    try {
+        const { start, end, vesselType = 'research' } = req.body;
+        
+        if (!start || !end) {
+            return res.status(400).json({ 
+                error: 'Start and end locations required' 
+            });
+        }
+
+        // Generate waypoints
+        const waypoints = [start];
+        const numPoints = 3 + Math.floor(Math.random() * 3);
+        for (let i = 1; i <= numPoints; i++) {
+            const t = i / (numPoints + 1);
+            waypoints.push({
+                lat: start.lat + (end.lat - start.lat) * t + (Math.random() - 0.5) * 0.5,
+                lng: start.lng + (end.lng - start.lng) * t + (Math.random() - 0.5) * 0.5
+            });
+        }
+        waypoints.push(end);
+
+        const distance = 200 + Math.random() * 800;
+        const duration = 12 + Math.random() * 36;
+        const fuelEfficiency = 60 + Math.random() * 35;
+
+        res.json({
+            route: {
+                distance: distance,
+                duration: duration,
+                fuelEfficiency: fuelEfficiency,
+                waypoints: waypoints,
+                source: 'mock'
+            },
+            aiSuggestion: `Route optimized for ${vesselType} vessel. Estimated distance: ${distance.toFixed(0)} km, duration: ${duration.toFixed(1)} hours, fuel efficiency: ${fuelEfficiency.toFixed(0)}%.`,
+            timestamp: new Date().toISOString()
+        });
+    } catch (error) {
+        console.error('Route optimization error:', error);
+        res.status(500).json({ error: 'Failed to optimize route' });
+    }
+});
+
+// AI Chat API
+app.post('/api/ai/chat', (req, res) => {
+    try {
+        const { message, context } = req.body;
+        
+        if (!message) {
+            return res.status(400).json({ 
+                error: 'Message is required' 
+            });
+        }
+
+        const responses = [
+            `Based on current ice conditions and wind speeds, I recommend maintaining a heading of ${Math.round(Math.random() * 360)}° at ${Math.round(8 + Math.random() * 8)} knots. Keep watch for potential icebergs in the area.`,
+            `The forecast shows improving conditions over the next 6-8 hours. Ice concentration is expected to decrease. Consider adjusting your route to take advantage of open water leads.`,
+            `Multiple hazards detected within ${Math.round(20 + Math.random() * 30)} nautical miles. Two icebergs are drifting. Recommended safe distance: 5 NM.`,
+            `Weather advisory: ${['Blizzard', 'High Winds', 'Heavy Snow', 'Freezing Spray'][Math.floor(Math.random() * 4)]} conditions expected. Fuel efficiency is ${Math.round(60 + Math.random() * 35)}%. Consider sheltering near the ice edge.`
+        ];
+
+        let response = responses[Math.floor(Math.random() * responses.length)];
+        
+        // If message contains specific keywords, return relevant response
+        if (message.toLowerCase().includes('weather')) response = responses[3];
+        else if (message.toLowerCase().includes('ice')) response = responses[0];
+        else if (message.toLowerCase().includes('hazard') || message.toLowerCase().includes('danger')) response = responses[2];
+        else if (message.toLowerCase().includes('route') || message.toLowerCase().includes('path')) response = responses[1];
+
+        res.json({
+            response: response,
+            model: 'mock',
+            timestamp: new Date().toISOString()
+        });
+    } catch (error) {
+        console.error('AI chat error:', error);
+        res.status(500).json({ error: 'Failed to get AI response' });
+    }
+});
 // Admin routes
 app.get('/api/admin/stats', authenticate, authorize('admin'), AdminController.getStats);
 
