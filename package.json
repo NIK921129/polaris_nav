@@ -8,34 +8,14 @@
     "dev": "nodemon backend/server.js",
     "backend": "node backend/server.js",
     "backend:dev": "nodemon backend/server.js",
-    "frontend": "open frontend/index.html",
+    "frontend": "npx serve frontend -l 5173",
     "test": "jest",
-    "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage",
     "lint": "eslint backend/ frontend/",
-    "lint:fix": "eslint --fix backend/ frontend/",
-    "format": "prettier --write \"**/*.{js,json,md}\"",
-    "db:seed": "node scripts/seed-db.js",
-    "db:backup": "node scripts/backup.js",
-    "docker:up": "docker-compose up -d",
-    "docker:down": "docker-compose down",
-    "deploy": "bash scripts/deploy.sh",
-    "clean": "rm -rf node_modules/ logs/ dist/",
-    "setup": "npm install && npm run db:seed"
+    "format": "prettier --write \"**/*.{js,json,md,html,css}\""
   },
   "keywords": [
-    "antarctic",
-    "navigation",
-    "ai",
-    "machine-learning",
-    "sea-ice",
-    "iceberg",
-    "route-optimization",
-    "polar",
-    "marine",
-    "gis",
-    "weather",
-    "satellite"
+    "antarctic", "navigation", "ai", "sea-ice", "iceberg",
+    "route-optimization", "polar", "marine", "gis"
   ],
   "author": "Polaris Nav Team",
   "license": "MIT",
@@ -43,16 +23,11 @@
     "type": "git",
     "url": "https://github.com/NIK921129/polaris_nav"
   },
-  "bugs": {
-    "url": "https://github.com/NIK921129/polaris_nav/issues"
-  },
-  "homepage": "https://polaris-nav.vercel.app",
   "engines": {
     "node": ">=16.0.0",
     "npm": ">=8.0.0"
   },
   "dependencies": {
-    "@sentry/node": "^7.45.0",
     "axios": "^1.3.4",
     "bcryptjs": "^2.4.3",
     "compression": "^1.7.4",
@@ -60,16 +35,11 @@
     "dotenv": "^16.0.3",
     "express": "^4.18.2",
     "express-rate-limit": "^6.7.0",
-    "express-validator": "^7.0.1",
     "helmet": "^7.0.0",
     "jsonwebtoken": "^9.0.0",
     "mongoose": "^7.0.3",
-    "multer": "^1.4.5-lts.1",
     "node-cache": "^5.1.2",
-    "nodemailer": "^6.9.1",
     "socket.io": "^4.5.4",
-    "jimp": "^0.22.10",
-    "twilio": "^3.84.0",
     "winston": "^3.8.2"
   },
   "devDependencies": {

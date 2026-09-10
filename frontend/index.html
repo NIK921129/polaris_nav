@@ -1,326 +1,253 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <title>❄️ Polaris Nav - Antarctic Navigation</title>
-    
-    <!-- CDN Dependencies -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
-    <link rel="stylesheet" href="style.css" />
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#0a0e17" />
+  <title>❄️ Polaris Nav — Antarctic Navigation</title>
+
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-    <!-- ==================== DEMO MODE BANNER ==================== -->
-    <div id="api-status-banner" class="demo-banner" style="display:none;">
-        <i class="fas fa-flask"></i>
-        <span id="demo-banner-text">🎭 Demo Mode: Using realistic mock data</span>
-        <span style="font-size:10px;opacity:0.7;margin-left:8px;">
-            <a href="#" onclick="document.getElementById('admin-tab')?.click(); return false;" style="color:#ffa500;text-decoration:underline;">
-                Add API Keys
-            </a>
-        </span>
+  <!-- DEMO BANNER -->
+  <div id="api-status-banner" class="demo-banner" hidden>
+    <i class="fas fa-flask"></i>
+    <span id="demo-banner-text">🎭 Demo Mode — using realistic mock data</span>
+    <a href="#" id="banner-admin-link">Add API keys →</a>
+  </div>
+
+  <div id="app">
+    <!-- SIDEBAR -->
+    <aside id="sidebar" class="glass">
+      <div class="logo">
+        <i class="fas fa-snowflake"></i>
+        <span>Polaris</span>
+      </div>
+
+      <nav>
+        <button class="nav-btn active" data-page="dashboard" title="Dashboard">
+          <i class="fas fa-map"></i><span>Dashboard</span>
+        </button>
+        <button class="nav-btn" data-page="route" title="Route Planner">
+          <i class="fas fa-route"></i><span>Route</span>
+        </button>
+        <button class="nav-btn" data-page="camera" title="Camera">
+          <i class="fas fa-camera"></i><span>Camera</span>
+        </button>
+        <button class="nav-btn" data-page="weather" title="Weather">
+          <i class="fas fa-cloud-sun"></i><span>Weather</span>
+        </button>
+        <button class="nav-btn" data-page="admin" title="Admin">
+          <i class="fas fa-cog"></i><span>Admin</span>
+        </button>
+      </nav>
+
+      <div class="sidebar-status">
+        <span class="status-dot online"></span>
+        <span class="status-text" id="connection-status">Online</span>
+      </div>
+    </aside>
+
+    <!-- MAP -->
+    <main id="map-container">
+      <div id="map"></div>
+      <div id="map-controls" class="glass">
+        <button data-action="zoom-in" title="Zoom In"><i class="fas fa-plus"></i></button>
+        <button data-action="zoom-out" title="Zoom Out"><i class="fas fa-minus"></i></button>
+        <button data-action="center-vessel" title="Center on Vessel"><i class="fas fa-location-dot"></i></button>
+        <button data-action="toggle-ice" title="Toggle Ice"><i class="fas fa-snowflake"></i></button>
+        <button data-action="toggle-hazards" title="Toggle Hazards"><i class="fas fa-triangle-exclamation"></i></button>
+        <button data-action="toggle-weather" title="Toggle Weather"><i class="fas fa-wind"></i></button>
+      </div>
+    </main>
+
+    <!-- PAGES -->
+    <section id="pages">
+      <!-- DASHBOARD -->
+      <div id="page-dashboard" class="page active">
+        <div class="dashboard-grid">
+          <div class="widget glass" id="weather-widget">
+            <div class="widget-header"><i class="fas fa-cloud-sun"></i><h3>Weather</h3></div>
+            <div class="widget-content">
+              <div class="weather-temp">--°C</div>
+              <div class="weather-desc">Loading…</div>
+              <div class="weather-details">
+                <span><i class="fas fa-wind"></i> -- km/h</span>
+                <span><i class="fas fa-tint"></i> --%</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="widget glass" id="ice-widget">
+            <div class="widget-header"><i class="fas fa-snowflake"></i><h3>Ice Concentration</h3></div>
+            <div class="widget-content">
+              <div class="ice-percentage">--%</div>
+              <div class="ice-status">Loading…</div>
+              <div class="ice-progress"><div class="ice-progress-bar" style="width:0%"></div></div>
+            </div>
+          </div>
+
+          <div class="widget glass" id="position-widget">
+            <div class="widget-header"><i class="fas fa-location-dot"></i><h3>Position</h3></div>
+            <div class="widget-content">
+              <div class="position-coords"><span>Lat: --°</span><span>Lng: --°</span></div>
+              <div class="position-status">Acquiring…</div>
+            </div>
+          </div>
+
+          <div class="widget glass" id="hazards-widget">
+            <div class="widget-header"><i class="fas fa-triangle-exclamation"></i><h3>Hazards</h3></div>
+            <div class="widget-content">
+              <div class="hazards-count">0 detected</div>
+              <div class="hazards-list"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ROUTE -->
+      <div id="page-route" class="page">
+        <div class="route-panel glass">
+          <h2><i class="fas fa-route"></i> Route Planner</h2>
+          <div class="route-inputs">
+            <div class="input-group">
+              <label for="route-start">Start Location</label>
+              <div class="input-row">
+                <input type="text" id="route-start" placeholder="e.g. -70, 0" />
+                <button class="btn-secondary" data-action="set-start"><i class="fas fa-location-dot"></i> Set</button>
+              </div>
+            </div>
+            <div class="input-group">
+              <label for="route-end">End Location</label>
+              <div class="input-row">
+                <input type="text" id="route-end" placeholder="e.g. -65, -60" />
+                <button class="btn-secondary" data-action="set-end"><i class="fas fa-location-dot"></i> Set</button>
+              </div>
+            </div>
+            <div class="input-group">
+              <label for="vessel-type">Vessel Type</label>
+              <select id="vessel-type">
+                <option value="research">Research Vessel</option>
+                <option value="icebreaker">Icebreaker</option>
+                <option value="cargo">Cargo Ship</option>
+              </select>
+            </div>
+            <button class="btn-primary" data-action="optimize-route">
+              <i class="fas fa-route"></i> Optimize Route
+            </button>
+          </div>
+          <div id="route-results" class="route-results"></div>
+        </div>
+      </div>
+
+      <!-- CAMERA -->
+      <div id="page-camera" class="page">
+        <div class="camera-panel glass">
+          <h2><i class="fas fa-camera"></i> Camera & Analysis</h2>
+          <div class="camera-container">
+            <div id="camera-view">
+              <video id="camera-stream" autoplay playsinline muted></video>
+              <div id="camera-overlay" hidden>
+                <button class="btn-capture" data-action="capture" title="Capture">
+                  <i class="fas fa-circle"></i>
+                </button>
+              </div>
+            </div>
+            <div id="camera-preview"></div>
+          </div>
+          <div class="camera-controls">
+            <button class="btn-secondary" data-action="init-camera"><i class="fas fa-play"></i> Start</button>
+            <button class="btn-secondary" data-action="switch-camera"><i class="fas fa-rotate"></i> Switch</button>
+            <button class="btn-secondary" data-action="upload-image"><i class="fas fa-upload"></i> Upload</button>
+            <button class="btn-primary" data-action="analyze-image"><i class="fas fa-robot"></i> Analyze</button>
+          </div>
+          <div id="analysis-results" class="analysis-results"></div>
+          <input type="file" id="file-upload" accept="image/*" hidden />
+        </div>
+      </div>
+
+      <!-- WEATHER -->
+      <div id="page-weather" class="page">
+        <div class="weather-panel glass">
+          <h2><i class="fas fa-cloud-sun"></i> Weather & Ocean Data</h2>
+          <div class="weather-grid">
+            <div class="weather-card"><h3>Current</h3><div id="current-weather"></div></div>
+            <div class="weather-card"><h3>Forecast</h3><div id="weather-forecast"></div></div>
+            <div class="weather-card"><h3>Ocean</h3><div id="ocean-data"></div></div>
+            <div class="weather-card"><h3>Wind</h3><div id="wind-data"></div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ADMIN -->
+      <div id="page-admin" class="page">
+        <div class="admin-panel glass">
+          <h2><i class="fas fa-cog"></i> Admin Panel</h2>
+
+          <div class="admin-section">
+            <h3>🔑 API Status</h3>
+            <div id="api-status" class="api-status-grid"></div>
+            <p class="hint"><i class="fas fa-info-circle"></i> Leave API keys blank to use <strong>DEMO DATA</strong>.</p>
+          </div>
+
+          <div class="admin-section">
+            <h3>API Keys</h3>
+            <div id="api-keys-container"></div>
+          </div>
+
+          <div class="admin-section">
+            <h3>AI Configuration</h3>
+            <div class="admin-row">
+              <label for="ai-model">Primary AI Model</label>
+              <select id="ai-model">
+                <option value="gemini">Google Gemini</option>
+                <option value="openai">OpenAI</option>
+                <option value="claude">Anthropic Claude</option>
+              </select>
+            </div>
+            <div class="admin-row">
+              <label for="prompt-template">Prompt Template</label>
+              <textarea id="prompt-template" rows="6"></textarea>
+              <button class="btn-primary" data-action="save-prompt"><i class="fas fa-save"></i> Save Prompt</button>
+            </div>
+          </div>
+
+          <div class="admin-section">
+            <h3>System Status</h3>
+            <div id="system-status"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- AI CHAT -->
+    <div id="ai-chat" class="glass">
+      <div class="chat-header" id="chat-header">
+        <i class="fas fa-robot"></i>
+        <span>AI Assistant</span>
+        <button class="chat-toggle" id="chat-toggle" aria-label="Toggle chat">
+          <i class="fas fa-chevron-down"></i>
+        </button>
+      </div>
+      <div class="chat-body">
+        <div id="chat-messages"></div>
+        <div class="chat-input">
+          <input type="text" id="user-input" placeholder="Ask about navigation…" autocomplete="off" />
+          <button id="send-btn" data-action="send-message" aria-label="Send">
+            <i class="fas fa-paper-plane"></i>
+          </button>
+        </div>
+      </div>
     </div>
 
-    <div id="app">
-        <!-- ==================== SIDEBAR ==================== -->
-        <div id="sidebar" class="glass">
-            <div class="logo">
-                <i class="fas fa-snowflake"></i>
-                <span>Polaris</span>
-            </div>
-            
-            <nav>
-                <button class="nav-btn active" data-page="dashboard" title="Dashboard">
-                    <i class="fas fa-map"></i>
-                    <span>Dashboard</span>
-                </button>
-                <button class="nav-btn" data-page="route" title="Route Planner">
-                    <i class="fas fa-route"></i>
-                    <span>Route</span>
-                </button>
-                <button class="nav-btn" data-page="camera" title="Camera">
-                    <i class="fas fa-camera"></i>
-                    <span>Camera</span>
-                </button>
-                <button class="nav-btn" data-page="weather" title="Weather">
-                    <i class="fas fa-cloud-sun"></i>
-                    <span>Weather</span>
-                </button>
-                <button class="nav-btn" data-page="admin" title="Admin" id="admin-tab">
-                    <i class="fas fa-cog"></i>
-                    <span>Admin</span>
-                </button>
-            </nav>
-            
-            <div class="sidebar-status">
-                <span class="status-dot online"></span>
-                <span class="status-text">Online</span>
-            </div>
-        </div>
+    <div id="toast-container"></div>
+  </div>
 
-        <!-- ==================== MAP CONTAINER ==================== -->
-        <div id="map-container">
-            <div id="map"></div>
-            
-            <!-- Map Controls Overlay -->
-            <div id="map-controls" class="glass">
-                <button onclick="window.zoomIn?.()" title="Zoom In">
-                    <i class="fas fa-plus"></i>
-                </button>
-                <button onclick="window.zoomOut?.()" title="Zoom Out">
-                    <i class="fas fa-minus"></i>
-                </button>
-                <button onclick="window.centerOnVessel?.()" title="Center on Vessel">
-                    <i class="fas fa-location-dot"></i>
-                </button>
-                <button onclick="window.toggleLayer?.('ice')" title="Toggle Ice Layer">
-                    <i class="fas fa-snowflake"></i>
-                </button>
-                <button onclick="window.toggleLayer?.('hazards')" title="Toggle Hazards">
-                    <i class="fas fa-triangle-exclamation"></i>
-                </button>
-                <button onclick="window.toggleLayer?.('weather')" title="Toggle Weather">
-                    <i class="fas fa-wind"></i>
-                </button>
-            </div>
-        </div>
-
-        <!-- ==================== PAGES ==================== -->
-        <div id="pages">
-            <!-- DASHBOARD PAGE -->
-            <div id="page-dashboard" class="page active">
-                <div class="dashboard-grid">
-                    <div class="widget glass" id="weather-widget">
-                        <div class="widget-header">
-                            <i class="fas fa-cloud-sun"></i>
-                            <h3>Weather</h3>
-                        </div>
-                        <div class="widget-content">
-                            <div class="weather-temp">--°C</div>
-                            <div class="weather-desc">Loading...</div>
-                            <div class="weather-details">
-                                <span><i class="fas fa-wind"></i> -- km/h</span>
-                                <span><i class="fas fa-tint"></i> --%</span>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="widget glass" id="ice-widget">
-                        <div class="widget-header">
-                            <i class="fas fa-snowflake"></i>
-                            <h3>Ice Concentration</h3>
-                        </div>
-                        <div class="widget-content">
-                            <div class="ice-percentage">--%</div>
-                            <div class="ice-status">Loading...</div>
-                            <div class="ice-progress">
-                                <div class="ice-progress-bar" style="width: 0%"></div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="widget glass" id="position-widget">
-                        <div class="widget-header">
-                            <i class="fas fa-location-dot"></i>
-                            <h3>Position</h3>
-                        </div>
-                        <div class="widget-content">
-                            <div class="position-coords">
-                                <span>Lat: --°</span>
-                                <span>Lng: --°</span>
-                            </div>
-                            <div class="position-status">Acquiring...</div>
-                        </div>
-                    </div>
-
-                    <div class="widget glass" id="hazards-widget">
-                        <div class="widget-header">
-                            <i class="fas fa-triangle-exclamation"></i>
-                            <h3>Hazards</h3>
-                        </div>
-                        <div class="widget-content">
-                            <div class="hazards-count">0 detected</div>
-                            <div class="hazards-list"></div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- ROUTE PAGE -->
-            <div id="page-route" class="page">
-                <div class="route-panel glass">
-                    <h2><i class="fas fa-route"></i> Route Planner</h2>
-                    <div class="route-inputs">
-                        <div class="input-group">
-                            <label>Start Location</label>
-                            <input type="text" id="route-start" placeholder="e.g., -70, 0" />
-                            <button onclick="window.setStart?.()" class="btn-secondary">
-                                <i class="fas fa-location-dot"></i> Set
-                            </button>
-                        </div>
-                        <div class="input-group">
-                            <label>End Location</label>
-                            <input type="text" id="route-end" placeholder="e.g., -65, -60" />
-                            <button onclick="window.setEnd?.()" class="btn-secondary">
-                                <i class="fas fa-location-dot"></i> Set
-                            </button>
-                        </div>
-                        <div class="input-group">
-                            <label>Vessel Type</label>
-                            <select id="vessel-type">
-                                <option value="research">Research Vessel</option>
-                                <option value="icebreaker">Icebreaker</option>
-                                <option value="cargo">Cargo Ship</option>
-                            </select>
-                        </div>
-                        <button onclick="window.optimizeRoute?.()" class="btn-primary">
-                            <i class="fas fa-route"></i> Optimize Route
-                        </button>
-                    </div>
-                    <div id="route-results" class="route-results"></div>
-                </div>
-            </div>
-
-            <!-- CAMERA PAGE -->
-            <div id="page-camera" class="page">
-                <div class="camera-panel glass">
-                    <h2><i class="fas fa-camera"></i> Camera & Analysis</h2>
-                    <div class="camera-container">
-                        <div id="camera-view">
-                            <video id="camera-stream" autoplay playsinline></video>
-                            <div id="camera-overlay">
-                                <button onclick="window.capture?.()" class="btn-capture">
-                                    <i class="fas fa-circle"></i>
-                                </button>
-                            </div>
-                        </div>
-                        <div id="camera-preview"></div>
-                    </div>
-                    <div class="camera-controls">
-                        <button onclick="window.initCamera?.()" class="btn-secondary">
-                            <i class="fas fa-play"></i> Start Camera
-                        </button>
-                        <button onclick="window.switchCamera?.()" class="btn-secondary">
-                            <i class="fas fa-rotate"></i> Switch
-                        </button>
-                        <button onclick="window.uploadImage?.()" class="btn-secondary">
-                            <i class="fas fa-upload"></i> Upload
-                        </button>
-                        <button onclick="window.analyzeImage?.()" class="btn-primary">
-                            <i class="fas fa-robot"></i> Analyze
-                        </button>
-                    </div>
-                    <div id="analysis-results" class="analysis-results"></div>
-                    <input type="file" id="file-upload" accept="image/*" style="display:none" />
-                </div>
-            </div>
-
-            <!-- WEATHER PAGE -->
-            <div id="page-weather" class="page">
-                <div class="weather-panel glass">
-                    <h2><i class="fas fa-cloud-sun"></i> Weather & Ocean Data</h2>
-                    <div class="weather-grid">
-                        <div class="weather-card">
-                            <h3>Current Conditions</h3>
-                            <div id="current-weather"></div>
-                        </div>
-                        <div class="weather-card">
-                            <h3>Forecast</h3>
-                            <div id="weather-forecast"></div>
-                        </div>
-                        <div class="weather-card">
-                            <h3>Ocean Data</h3>
-                            <div id="ocean-data"></div>
-                        </div>
-                        <div class="weather-card">
-                            <h3>Wind Conditions</h3>
-                            <div id="wind-data"></div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- ADMIN PAGE -->
-            <div id="page-admin" class="page">
-                <div class="admin-panel glass">
-                    <h2><i class="fas fa-cog"></i> Admin Panel</h2>
-                    
-                    <!-- ===== API STATUS DISPLAY ===== -->
-                    <div class="admin-section">
-                        <h3>🔑 API Status</h3>
-                        <div id="api-status" class="api-status-grid"></div>
-                        <p style="font-size:11px;color:var(--text-muted);margin-top:8px;">
-                            <i class="fas fa-info-circle"></i> 
-                            Leave API keys blank to use <strong>DEMO DATA</strong>
-                        </p>
-                    </div>
-                    
-                    <!-- ===== API KEYS SECTION ===== -->
-                    <div class="admin-section">
-                        <h3>API Keys</h3>
-                        <div id="api-keys-container"></div>
-                    </div>
-                    
-                    <!-- ===== AI CONFIGURATION ===== -->
-                    <div class="admin-section">
-                        <h3>AI Configuration</h3>
-                        <div class="admin-row">
-                            <label>Primary AI Model</label>
-                            <select id="ai-model">
-                                <option value="gemini">Google Gemini</option>
-                                <option value="openai">OpenAI</option>
-                                <option value="claude">Anthropic Claude</option>
-                            </select>
-                        </div>
-                        <div class="admin-row">
-                            <label>Prompt Template</label>
-                            <textarea id="prompt-template" rows="6"></textarea>
-                            <button onclick="window.savePrompt?.()" class="btn-primary">
-                                <i class="fas fa-save"></i> Save Prompt
-                            </button>
-                        </div>
-                    </div>
-                    
-                    <!-- ===== SYSTEM STATUS ===== -->
-                    <div class="admin-section">
-                        <h3>System Status</h3>
-                        <div id="system-status"></div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- ==================== AI CHAT ==================== -->
-        <div id="ai-chat" class="glass">
-            <div class="chat-header">
-                <i class="fas fa-robot"></i>
-                <span>AI Assistant</span>
-                <button onclick="document.getElementById('ai-chat').classList.toggle('minimized')" class="chat-toggle">
-                    <i class="fas fa-chevron-down"></i>
-                </button>
-            </div>
-            <div class="chat-body">
-                <div id="chat-messages"></div>
-                <div class="chat-input">
-                    <input type="text" id="user-input" placeholder="Ask about navigation..." />
-                    <button onclick="window.sendMessage?.()" id="send-btn">
-                        <i class="fas fa-paper-plane"></i>
-                    </button>
-                </div>
-            </div>
-        </div>
-
-        <!-- ==================== TOAST ==================== -->
-        <div id="toast-container"></div>
-    </div>
-
-    <!-- ==================== SCRIPTS ==================== -->
-    <!-- 1. External Libraries -->
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
-    <!-- 2. Main App -->
-    <script src="app.js"></script>
+  <!-- LIBS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+  <script src="app.js"></script>
 </body>
 </html>
