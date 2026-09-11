@@ -1,14 +1,106 @@
 // ============================================================
-// POLARIS NAV — FRONTEND APPLICATION (CLEAN)
+// POLARIS NAV — FRONTEND APPLICATION (FULL REWRITE)
 // Vanilla JS. No frameworks. Backend + mock fallback.
 // ============================================================
 
 // ------------------------------------------------------------
-// CONFIG
+// 1. CONFIG
 // ------------------------------------------------------------
-// Change to your live backend URL for production:
-// const API_BASE_URL = 'https://polarisnav.onrender.com/api';
-const API_BASE_URL = 'http://localhost:3000/api';
+// Auto-detect backend URL:
+//   - localhost / 127.0.0.1  → local backend
+//   - anything else          → production backend
+const API_BASE_URL = (() => {
+  const host = window.location.hostname;
+  if (host === 'localhost' || host === '127.0.0.1' || host === '') {
+    return 'http://localhost:3000/api';
+  }
+  return 'https://polarisnav.onrender.com/api';
+})();
+
+// Vessel profiles drive both UI and AI prompt constraints
+const VESSEL_PROFILES = {
+  research:   { label: 'Research Vessel',       class: 'Ice-class 1A',         speed: 12, range: 8000,  maxIce: 40, draught: 6.5 },
+  icebreaker: { label: 'Icebreaker',            class: 'Polar Class 6',        speed: 10, range: 12000, maxIce: 70, draught: 8.0 },
+  cargo:      { label: 'Cargo Ship',            class: 'Ice-class 1C',         speed: 14, range: 15000, maxIce: 25, draught: 9.5 },
+  fishing:    { label: 'Fishing Vessel',        class: 'Non-ice-strengthened', speed: 9,  range: 4000,  maxIce: 10, draught: 5.0 },
+  tourism:    { label: 'Tourism Vessel',        class: 'Ice-class 1B',         speed: 11, range: 6000,  maxIce: 30, draught: 5.5 }
+};
+
+// Default AI prompt template — detailed, structured, JSON-contractual
+const DEFAULT_PROMPT_TEMPLATE = `You are POLARIS, an Antarctic navigation decision-support assistant.
+You combine IMO Polar Code experience, IAATO operating guidelines, and NSIDC ice-analysis practice.
+You advise the master of a polar vessel. You DO NOT issue orders; you recommend and explain.
+
+# CONTEXT
+Vessel: {vesselName} | Class: {vesselClass} | Type: {vesselType}
+Cruise: {cruiseSpeedKn} kn | Range: {fuelRangeNm} nm | Max ice: {maxIcePct}% | Draught: {draughtM} m
+
+Mission: {startLat},{startLng} → {endLat},{endLng}
+Departure (UTC): {departureUTC} | Season: {season} | Sun: {sunState}
+Position: {positionLat},{positionLng} | Heading/SOG: {headingDeg}° / {sogKn} kn
+
+# OBSERVED CONDITIONS
+## Ice (source: {iceSource}, age: {iceAgeMinutes} min)
+- Concentration (50 NM corridor): {iceConcentrationPct}%
+- Zone: {iceArea} | Trend: {iceTrend} | Thickness: {iceThicknessM} m
+- Floe size: {iceFloeSizeM} m | Ice edge ahead: {iceEdgeNm} NM
+- High-conc cells (>60%): {iceHighConcCells} | Features: {iceFeatures}
+
+## Weather (source: {wxSource}, valid: {wxValidUTC})
+- Air: {wxTempC}°C | Wind: {wxWindKn} kn from {wxWindDirDeg}° | Gusts: {wxGustKn} kn
+- Vis: {wxVisNm} NM | Cloud/ceiling: {wxCloudPct}% / {wxCeilingFt} ft
+- Pressure: {wxPressureHpa} hPa ({wxPressureTrend}) | Sea: {wxSeaState} ({wxWaveHeightM} m)
+- Freezing spray: {wxSprayRisk} | Ice accretion 24h: {wxIceAccretion}
+
+## Forecast (72h, 12h steps)
+{wxForecastTable}
+
+## Hazards (top {hazardTopN} by proximity, {hazardCount} total)
+{hazardTable}
+
+# OPERATIONAL CONSTRAINTS (hard rules)
+1. Never exceed {maxIcePct}% ice concentration on track.
+2. Min 2 NM CPA from icebergs >100m.
+3. Min 5 NM from ice shelf fronts.
+4. If vis <1 NM AND ice >15%, speed ≤5 kn or hold.
+5. If wind >45 kn OR spray risk HIGH, shelter or heave-to.
+6. Respect closures: {closedSitesList}.
+7. Permitted landings only: {permittedSitesList}.
+8. Ice data >30 min old OR weather >60 min old → mark PRELIMINARY.
+9. Source="mock" → mark TRAINING-ONLY.
+10. Missing field → state it, lower confidence.
+
+# TASK
+Output ONLY strict JSON:
+{
+  "summary": "1-2 sentence executive summary",
+  "confidence": 0.0-1.0,
+  "confidenceReason": "why",
+  "dataQuality": {"ice":"","weather":"","hazards":"","overall":""},
+  "recommendation": {
+    "action": "proceed|proceed-with-caution|adjust-course|reduce-speed|hold|return-to-port",
+    "track": [{"lat":0,"lng":0,"note":"why"}],
+    "speedProfileKn": [{"fromNm":0,"toNm":0,"speed":0}],
+    "etaUTC": "",
+    "fuelEstimateTonnes": 0,
+    "distanceNm": 0
+  },
+  "risks": [{"rank":1,"hazardId":"","description":"","mitigation":""}],
+  "alternates": [{"name":"","distanceNm":0,"tradeoff":""}],
+  "watchItems": [""],
+  "regulatoryNotes": [""],
+  "explanation": "3-6 sentences plain language",
+  "nextReassessmentUTC": ""
+}
+
+Rules: bearings °T, distances NM, speeds knots, times UTC ISO-8601.
+If unsafe, action="hold" or "return-to-port" and explain.
+Do not invent data. Do not guess iceberg positions.
+If hazards empty, say so and note sensor blind spots.
+
+# EXAMPLE
+In: PC6 icebreaker 12kn, max ice 60%, -70,0→-65,-60, ice 25% pack, wind 22kn NW vis 5NM, H-001 240m 12NM @042°T HIGH.
+Out: {"summary":"Feasible via eastern leads; dogleg 3NM south for H-001.","confidence":0.82,"confidenceReason":"Ice/weather live; only 3 contacts detected.","dataQuality":{"ice":"live","weather":"live","hazards":"recent","overall":"operational"},"recommendation":{"action":"proceed-with-caution","track":[{"lat":-70,"lng":0,"note":"departure"},{"lat":-68.9,"lng":-14.2,"note":"enter lead system"},{"lat":-67.8,"lng":-30.1,"note":"dogleg south of H-001"},{"lat":-66.4,"lng":-46.8,"note":"rejoin rhumb"},{"lat":-65,"lng":-60,"note":"arrival"}],"speedProfileKn":[{"fromNm":0,"toNm":45,"speed":12},{"fromNm":45,"toNm":120,"speed":8},{"fromNm":120,"toNm":187,"speed":12}],"etaUTC":"2026-09-11T18:30:00Z","fuelEstimateTonnes":42.3,"distanceNm":187.4},"risks":[{"rank":1,"hazardId":"H-001","description":"240m iceberg 12NM @042°T","mitigation":"dogleg 3NM south, 2NM CPA"}],"alternates":[{"name":"Southern bypass","distanceNm":210,"tradeoff":"+23NM, zero contact"}],"watchItems":["+36h wind veer SW 35kn"],"regulatoryNotes":[],"explanation":"Direct track passes 2.4NM from H-001. Dogleg 3NM south; reduce to 8kn through 40% band. Reassess +36h.","nextReassessmentUTC":"2026-09-11T12:00:00Z"}`;
 
 const CONFIG = {
   apis: {
@@ -21,18 +113,16 @@ const CONFIG = {
     openai:      { url: 'https://api.openai.com/v1' }
   },
   aiModel: 'gemini',
-  promptTemplate: `You are an Antarctic navigation expert. Analyze:
-Position: {position}
-Ice: {ice}
-Weather: {weather}
-Hazards: {hazards}
-Provide a route recommendation.`,
+  promptTemplate: DEFAULT_PROMPT_TEMPLATE,
   pollingInterval: 300000,
   vesselType: 'research',
   iceThreshold: 30,
   windThreshold: 20
 };
 
+// ------------------------------------------------------------
+// 2. STATE
+// ------------------------------------------------------------
 const STATE = {
   position: { lat: -70.0, lng: 0.0 },
   route: [],
@@ -42,11 +132,14 @@ const STATE = {
   weather: null,
   currentPage: 'dashboard',
   chatHistory: [],
-  isPolling: true
+  isPolling: true,
+  lastIceUpdate: null,
+  lastWeatherUpdate: null,
+  lastHazardUpdate: null
 };
 
 // ------------------------------------------------------------
-// UTILS
+// 3. UTILS
 // ------------------------------------------------------------
 const Utils = {
   toast(message, type = 'info') {
@@ -80,6 +173,21 @@ const Utils = {
     return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   },
 
+  bearing(p1, p2) {
+    const φ1 = p1.lat * Math.PI / 180;
+    const φ2 = p2.lat * Math.PI / 180;
+    const Δλ = (p2.lng - p1.lng) * Math.PI / 180;
+    const y = Math.sin(Δλ) * Math.cos(φ2);
+    const x = Math.cos(φ1) * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ);
+    return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+  },
+
+  cardinal(deg) {
+    const dirs = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE',
+                  'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
+    return dirs[Math.round(deg / 22.5) % 16];
+  },
+
   save(key, data) {
     try { localStorage.setItem(`polaris_${key}`, JSON.stringify(data)); } catch {}
   },
@@ -89,11 +197,23 @@ const Utils = {
       return raw ? JSON.parse(raw) : null;
     } catch { return null; }
   },
-  uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+  uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); },
+
+  escapeHtml(s) {
+    if (s == null) return '';
+    return String(s).replace(/[&<>"']/g, c => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    })[c]);
+  },
+
+  ageMinutes(iso) {
+    if (!iso) return 9999;
+    return Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
+  }
 };
 
 // ------------------------------------------------------------
-// API LAYER (with mock fallback)
+// 4. API LAYER (with mock fallback)
 // ------------------------------------------------------------
 const API = {
   async call(endpoint, params = {}, method = 'GET', body = null) {
@@ -123,8 +243,14 @@ const API = {
   weather: {
     async getCurrent(lat, lng) {
       const d = await API.call('/weather/current', { lat, lng });
-      if (d?.current) return { ...d.current, temp: d.current.temperature, source: d.current.source || 'api' };
-      return this._mock(lat, lng);
+      if (d?.current) {
+        return {
+          ...d.current,
+          temp: d.current.temperature,
+          source: d.current.source || 'api'
+        };
+      }
+      return this._mock();
     },
     _mock() {
       const conds = ['Partly Cloudy', 'Overcast', 'Light Snow', 'Clear Skies', 'Foggy'];
@@ -136,8 +262,23 @@ const API = {
         windDeg: Math.round(Math.random() * 360),
         description: conds[Math.floor(Math.random() * conds.length)],
         pressure: 980 + Math.random() * 40,
+        visibility: 5 + Math.random() * 15,
+        clouds: 20 + Math.random() * 60,
         source: 'mock'
       };
+    },
+    async getForecast(lat, lng) {
+      const d = await API.call('/weather/forecast', { lat, lng });
+      if (d?.forecast) return d.forecast;
+      // mock 72h table
+      return Array.from({ length: 6 }, (_, i) => ({
+        time: new Date(Date.now() + (i + 1) * 12 * 3600_000).toISOString(),
+        windKn: Math.round(15 + Math.random() * 30),
+        windDir: ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'][Math.floor(Math.random() * 8)],
+        visNm: (1 + Math.random() * 8).toFixed(1),
+        tempC: Math.round(-15 + Math.random() * 15),
+        precip: ['clear', 'snow', 'blizzard', 'fog'][Math.floor(Math.random() * 4)]
+      }));
     }
   },
 
@@ -159,6 +300,7 @@ const API = {
         concentration: 15 + Math.random() * 40,
         area: ['Marginal Ice Zone', 'Pack Ice', 'Fast Ice', 'Open Water'][Math.floor(Math.random() * 4)],
         trend: ['Stable', 'Increasing', 'Decreasing'][Math.floor(Math.random() * 3)],
+        thickness: 0.5 + Math.random() * 2,
         points,
         source: 'mock'
       };
@@ -174,13 +316,15 @@ const API = {
     _mock(lat, lng) {
       const types = ['iceberg', 'icefield', 'island', 'mountain'];
       const sev = ['low', 'medium', 'high', 'critical'];
-      return Array.from({ length: 2 + Math.floor(Math.random() * 4) }, () => ({
+      return Array.from({ length: 2 + Math.floor(Math.random() * 4) }, (_, i) => ({
+        id: `H-${String(i + 1).padStart(3, '0')}`,
         lat: lat + (Math.random() - 0.5) * 0.6,
         lng: lng + (Math.random() - 0.5) * 0.6,
         type: types[Math.floor(Math.random() * types.length)],
         size: 50 + Math.random() * 900,
         confidence: 0.6 + Math.random() * 0.35,
         severity: sev[Math.floor(Math.random() * sev.length)],
+        status: 'unknown',
         source: 'mock'
       }));
     }
@@ -226,7 +370,7 @@ const API = {
         `Multiple hazards within ${Math.round(20 + Math.random() * 30)} NM. Maintain 5 NM safe distance.`,
         `Weather advisory: ${['Blizzard', 'High Winds', 'Heavy Snow', 'Freezing Spray'][Math.floor(Math.random() * 4)]} expected. Fuel efficiency ${Math.round(60 + Math.random() * 35)}%.`
       ];
-      const q = message.toLowerCase();
+      const q = (message || '').toLowerCase();
       if (q.includes('weather')) return r[3];
       if (q.includes('ice')) return r[0];
       if (q.includes('hazard') || q.includes('danger')) return r[2];
@@ -244,7 +388,154 @@ const API = {
 };
 
 // ------------------------------------------------------------
-// MAP MANAGER
+// 5. CONTEXT BUILDER (AI prompt variables)
+// ------------------------------------------------------------
+class ContextBuilder {
+  static build({ start, end, vesselType }) {
+    const p = STATE.position;
+    const ice = STATE.iceData || {};
+    const wx = STATE.weather || {};
+    const hazards = [...(STATE.hazards || [])];
+
+    const vp = VESSEL_PROFILES[vesselType] || VESSEL_PROFILES.research;
+
+    // --- Ice aggregates from grid ---
+    const pts = ice.points || [];
+    const concs = pts.map(t => t[2]).filter(n => typeof n === 'number');
+    const meanConc = concs.length ? concs.reduce((a, b) => a + b, 0) / concs.length : (ice.concentration || 0);
+    const highCells = concs.filter(c => c > 60).length;
+
+    // --- Hazards ranked by proximity ---
+    const ranked = hazards
+      .map(h => {
+        const d = Utils.distance(p, h);
+        const brg = Utils.bearing(p, h);
+        return { ...h, _distNm: d / 1.852, _bearing: brg };
+      })
+      .sort((a, b) => a._distNm - b._distNm);
+
+    const topN = ranked.slice(0, 5);
+    const hazardTable = topN.length
+      ? topN.map((h, i) =>
+          `H-${String(i + 1).padStart(3, '0')} | ${h.type} | ${h._bearing.toFixed(0)}°T | ${h._distNm.toFixed(1)}NM | ${h.size || '?'}m | ${(h.severity || 'medium').toUpperCase()} | ${h.status || 'unknown'}`
+        ).join('\n')
+      : '(no hazards detected — sensor blind spots possible)';
+
+    // --- Forecast table (72h @ 12h steps) ---
+    const fc = wx.forecast || Array.from({ length: 6 }, (_, i) => ({
+      time: new Date(Date.now() + (i + 1) * 12 * 3600_000),
+      windKn: Math.round(15 + Math.random() * 30),
+      windDir: ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'][Math.floor(Math.random() * 8)],
+      visNm: (1 + Math.random() * 8).toFixed(1),
+      tempC: Math.round(-15 + Math.random() * 15),
+      precip: ['clear', 'snow', 'blizzard', 'fog'][Math.floor(Math.random() * 4)]
+    }));
+
+    const wxForecastTable = fc.map((f, i) => {
+      const windKn = f.windKn ?? Math.round((f.windSpeed || 0) / 1.852);
+      const windDir = f.windDir || Utils.cardinal(f.windDeg || 0);
+      const vis = f.visNm ?? (f.visibility || 10);
+      const temp = f.tempC ?? Math.round(f.temperature ?? 0);
+      const precip = f.precip || f.description || 'unknown';
+      return `+${(i + 1) * 12}h | wind ${windKn}kn ${windDir} | vis ${vis}NM | temp ${temp}C | ${precip}`;
+    }).join('\n');
+
+    // --- Season / sun state ---
+    const month = new Date().getUTCMonth(); // 0=Jan
+    const season = (month >= 10 || month <= 2) ? 'austral-summer'
+                 : (month >= 4 && month <= 8) ? 'austral-winter'
+                 : 'shoulder';
+    const sunState = season === 'austral-summer' ? 'daylight'
+                   : season === 'austral-winter' ? 'polar-night'
+                   : 'civil-twilight';
+
+    // --- Wind speed conversion: backend gives km/h, AI wants knots ---
+    const windKn = ((wx.windSpeed || 0) / 1.852).toFixed(1);
+    const gustKn = (((wx.windSpeed || 0) * 1.3) / 1.852).toFixed(1);
+
+    const sprayRisk = ((wx.temp ?? 0) < -2 && (wx.windSpeed || 0) > 25) ? 'HIGH' : 'LOW';
+
+    return {
+      // Vessel
+      vesselName: 'Polaris Vessel',
+      vesselClass: vp.class,
+      vesselType,
+      cruiseSpeedKn: vp.speed,
+      fuelRangeNm: vp.range,
+      maxIcePct: vp.maxIce,
+      draughtM: vp.draught,
+
+      // Mission
+      startLat: start.lat.toFixed(4),
+      startLng: start.lng.toFixed(4),
+      startName: 'Start',
+      endLat: end.lat.toFixed(4),
+      endLng: end.lng.toFixed(4),
+      endName: 'Destination',
+      departureUTC: new Date().toISOString(),
+      arrivalWindow: '24-48h',
+
+      // Position
+      positionLat: p.lat.toFixed(4),
+      positionLng: p.lng.toFixed(4),
+      headingDeg: 0,
+      sogKn: 0,
+      localTime: new Date().toISOString(),
+      season,
+      sunState,
+
+      // Ice
+      iceSource: ice.source || 'mock',
+      iceAgeMinutes: Utils.ageMinutes(STATE.lastIceUpdate),
+      iceConcentrationPct: meanConc.toFixed(1),
+      iceArea: ice.area || 'Unknown',
+      iceTrend: ice.trend || 'Stable',
+      iceThicknessM: (ice.thickness || 1.0).toFixed(1),
+      iceFloeSizeM: '50-200',
+      iceEdgeNm: '15',
+      iceHighConcCells: highCells,
+      iceFeatures: 'none reported',
+
+      // Weather
+      wxSource: wx.source || 'mock',
+      wxValidUTC: new Date().toISOString(),
+      wxTempC: (wx.temp ?? 0).toFixed(1),
+      wxFeelsC: (wx.feelsLike ?? wx.temp ?? 0).toFixed(1),
+      wxWindKn: windKn,
+      wxWindDirDeg: wx.windDeg || 0,
+      wxWindDirCard: Utils.cardinal(wx.windDeg || 0),
+      wxGustKn: gustKn,
+      wxVisNm: (wx.visibility || 10).toFixed(1),
+      wxCloudPct: wx.clouds || 50,
+      wxCeilingFt: '3000',
+      wxPrecip: wx.description || 'unknown',
+      wxPressureHpa: Math.round(wx.pressure || 1000),
+      wxPressureTrend: 'steady',
+      wxSeaState: 'moderate',
+      wxWaveHeightM: '1.5',
+      wxSprayRisk: sprayRisk,
+      wxIceAccretion: 'light',
+      wxForecastTable,
+
+      // Hazards
+      hazardSource: 'mock',
+      hazardCount: hazards.length,
+      hazardTopN: topN.length,
+      hazardTable,
+
+      // Regulatory
+      closedSitesList: 'none',
+      permittedSitesList: 'none'
+    };
+  }
+
+  static fill(template, vars) {
+    return String(template).replace(/\{(\w+)\}/g, (_, k) => vars[k] ?? 'unknown');
+  }
+}
+
+// ------------------------------------------------------------
+// 6. MAP MANAGER
 // ------------------------------------------------------------
 class MapManager {
   constructor() {
@@ -314,7 +605,7 @@ class MapManager {
   }
 
   updateIceLayer(data) {
-    if (this.layers.ice) this.map.removeLayer(this.layers.ice);
+    if (this.layers.ice) { this.map.removeLayer(this.layers.ice); this.layers.ice = null; }
     let points = data?.points;
     if (!points || !points.length) {
       points = [];
@@ -339,7 +630,7 @@ class MapManager {
   }
 
   updateHazards(hazards) {
-    if (this.layers.hazards) this.map.removeLayer(this.layers.hazards);
+    if (this.layers.hazards) { this.map.removeLayer(this.layers.hazards); this.layers.hazards = null; }
     if (!hazards?.length) return;
     const markers = hazards.map(h => {
       const icon = L.divIcon({
@@ -349,14 +640,14 @@ class MapManager {
         iconAnchor: [11, 11]
       });
       return L.marker([h.lat, h.lng], { icon })
-        .bindPopup(`<b>${h.type}</b><br>Size: ${h.size || '?'}m<br>Severity: ${h.severity || '?'}`);
+        .bindPopup(`<b>${Utils.escapeHtml(h.type)}</b><br>Size: ${h.size || '?'}m<br>Severity: ${Utils.escapeHtml(h.severity || '?')}`);
     });
     this.layers.hazards = L.layerGroup(markers).addTo(this.map);
   }
 
   updateRoute(waypoints) {
-    if (this.layers.route) this.map.removeLayer(this.layers.route);
-    if (this.layers.routeMarkers) this.map.removeLayer(this.layers.routeMarkers);
+    if (this.layers.route) { this.map.removeLayer(this.layers.route); this.layers.route = null; }
+    if (this.layers.routeMarkers) { this.map.removeLayer(this.layers.routeMarkers); this.layers.routeMarkers = null; }
     if (!waypoints || waypoints.length < 2) return;
 
     const latlngs = waypoints.map(w => [w.lat, w.lng]);
@@ -371,14 +662,15 @@ class MapManager {
         iconSize: [24, 24],
         iconAnchor: [12, 12]
       });
-      return L.marker([w.lat, w.lng], { icon });
+      return L.marker([w.lat, w.lng], { icon })
+        .bindPopup(w.note ? `<b>WP-${i + 1}</b><br>${Utils.escapeHtml(w.note)}` : `WP-${i + 1}`);
     });
     this.layers.routeMarkers = L.layerGroup(markers).addTo(this.map);
-    this.map.fitBounds(latlngs, { padding: [60, 60] });
+    try { this.map.fitBounds(latlngs, { padding: [60, 60] }); } catch {}
   }
 
   updateWeather(weather) {
-    if (this.layers.weather) this.map.removeLayer(this.layers.weather);
+    if (this.layers.weather) { this.map.removeLayer(this.layers.weather); this.layers.weather = null; }
     if (!weather) return;
     const icon = L.divIcon({
       className: 'wind-arrow',
@@ -393,7 +685,7 @@ class MapManager {
 
   addMarker(lat, lng, popup = '') {
     const m = L.marker([lat, lng]).addTo(this.map);
-    if (popup) m.bindPopup(popup);
+    if (popup) m.bindPopup(Utils.escapeHtml(popup));
     this.markers.push(m);
     return m;
   }
@@ -412,7 +704,7 @@ class MapManager {
 }
 
 // ------------------------------------------------------------
-// ROUTE MANAGER
+// 7. ROUTE MANAGER
 // ------------------------------------------------------------
 class RouteManager {
   constructor() {
@@ -474,25 +766,44 @@ class RouteManager {
     }
     Utils.toast('🔄 Optimizing route…', 'info');
 
+    const results = document.getElementById('route-results');
+    if (results) {
+      results.classList.add('show');
+      results.innerHTML = `<div class="route-info"><p><i class="fas fa-spinner fa-spin"></i> Working…</p></div>`;
+    }
+
     try {
       const vesselType = document.getElementById('vessel-type')?.value || CONFIG.vesselType;
-      const [weatherData, iceData] = await Promise.all([
+
+      // Ensure fresh data before building prompt
+      const [weatherData, iceData, hazardData] = await Promise.all([
         API.weather.getCurrent(STATE.position.lat, STATE.position.lng),
-        API.ice.getConcentration(STATE.position.lat, STATE.position.lng)
+        API.ice.getConcentration(STATE.position.lat, STATE.position.lng),
+        API.hazards.getHazards(STATE.position.lat, STATE.position.lng)
       ]);
+      STATE.weather = weatherData;
+      STATE.iceData = iceData;
+      STATE.hazards = hazardData;
+      STATE.lastWeatherUpdate = new Date().toISOString();
+      STATE.lastIceUpdate = new Date().toISOString();
+      STATE.lastHazardUpdate = new Date().toISOString();
+
       const routeResult = await API.route.optimize(this.start, this.end, vesselType);
 
-      const prompt = CONFIG.promptTemplate
-        .replace('{position}', JSON.stringify(STATE.position))
-        .replace('{ice}', JSON.stringify(iceData))
-        .replace('{weather}', JSON.stringify(weatherData))
-        .replace('{hazards}', JSON.stringify(STATE.hazards));
+      // Build the detailed AI prompt
+      const ctx = ContextBuilder.build({ start: this.start, end: this.end, vesselType });
+      const prompt = ContextBuilder.fill(CONFIG.promptTemplate, ctx);
 
-      const aiResponse = await API.ai.chat(prompt);
+      // Ask the AI; it returns JSON (per contract) — parse it
+      const aiRaw = await API.ai.chat(prompt, '');
+      const ai = this.tryParseJSON(aiRaw);
 
-      const optimized = routeResult.waypoints?.length
-        ? routeResult.waypoints
-        : this.generateWaypoints(this.start, this.end, iceData, weatherData);
+      // Waypoints: prefer AI's track, else backend's, else generate locally
+      const optimized = (ai?.recommendation?.track?.length)
+        ? ai.recommendation.track
+        : (routeResult.waypoints?.length)
+          ? routeResult.waypoints
+          : this.generateWaypoints(this.start, this.end, iceData, weatherData);
 
       window.mapManager.clearRoute();
       window.mapManager.updateRoute(optimized);
@@ -503,29 +814,133 @@ class RouteManager {
       const fuel = routeResult.fuelEfficiency ?? this.calcFuel(iceData, weatherData);
       const eta = routeResult.duration ?? this.calcETA(totalDist, weatherData);
 
-      const results = document.getElementById('route-results');
-      if (results) {
-        results.classList.add('show');
-        results.innerHTML = `
-          <div class="route-info">
-            <p><strong>📏 Distance:</strong> ${(routeResult.distance || totalDist).toFixed(1)} km</p>
-            <p><strong>⛽ Fuel efficiency:</strong> ${typeof fuel === 'number' ? fuel.toFixed(0) : fuel}%</p>
-            <p><strong>🕐 ETA:</strong> ${typeof eta === 'number' ? eta.toFixed(1) : eta} h</p>
-            <p><strong>📊 Waypoints:</strong> ${optimized.length}</p>
-            <hr>
-            <p><strong>🤖 AI:</strong></p>
-            <p style="font-size:12px;color:var(--text-muted);">${aiResponse || 'Route optimized.'}</p>
-            <p style="font-size:11px;color:var(--text-muted);margin-top:8px;">
-              ⚠️ Ice: ${(iceData.concentration || 0).toFixed(1)}% ·
-              Wind: ${(weatherData.windSpeed || 0).toFixed(0)} km/h
-            </p>
-          </div>`;
-      }
+      this.renderResults({
+        ai,
+        aiRaw,
+        routeResult,
+        optimized,
+        totalDist,
+        fuel,
+        eta,
+        iceData,
+        weatherData,
+        hazardData
+      });
+
       Utils.toast('✅ Route optimized', 'success');
     } catch (e) {
       console.error(e);
       Utils.toast('❌ Route optimization failed: ' + e.message, 'error');
+      if (results) {
+        results.innerHTML = `<div class="route-info"><p style="color:var(--accent-pink);">❌ ${Utils.escapeHtml(e.message)}</p></div>`;
+      }
     }
+  }
+
+  tryParseJSON(text) {
+    if (!text) return null;
+    if (typeof text === 'object') return text;
+    // Strip code fences if present
+    let s = String(text).trim();
+    s = s.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/i, '').trim();
+    try { return JSON.parse(s); } catch { return null; }
+  }
+
+  renderResults({ ai, aiRaw, routeResult, optimized, totalDist, fuel, eta, iceData, weatherData, hazardData }) {
+    const results = document.getElementById('route-results');
+    if (!results) return;
+
+    // If AI returned structured JSON, render rich view
+    if (ai?.recommendation) {
+      const dq = ai.dataQuality || {};
+      const rec = ai.recommendation;
+      const actionColor = {
+        'proceed': 'var(--accent-green)',
+        'proceed-with-caution': '#ffcc66',
+        'adjust-course': '#ffa500',
+        'reduce-speed': '#ffa500',
+        'hold': 'var(--accent-pink)',
+        'return-to-port': 'var(--accent-pink)'
+      }[rec.action] || 'var(--text-secondary)';
+
+      const conf = Math.round((ai.confidence ?? 0) * 100);
+
+      results.innerHTML = `
+        <div class="route-info">
+          <p style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+            <span style="padding:4px 10px;border-radius:6px;background:rgba(0,0,0,0.3);color:${actionColor};font-weight:700;text-transform:uppercase;font-size:11px;letter-spacing:0.5px;">
+              ${Utils.escapeHtml(rec.action || 'unknown')}
+            </span>
+            <span style="font-size:12px;color:var(--text-muted);">
+              confidence ${conf}% · data: ${Utils.escapeHtml(dq.overall || 'unknown')}
+            </span>
+          </p>
+          <p style="color:var(--text-primary);font-weight:600;margin-top:6px;">${Utils.escapeHtml(ai.summary || '')}</p>
+
+          <hr>
+          <p><strong>📏 Distance:</strong> ${(rec.distanceNm || routeResult.distance || totalDist).toFixed(1)} NM</p>
+          <p><strong>⛽ Fuel est.:</strong> ${(rec.fuelEstimateTonnes || 0).toFixed(1)} t</p>
+          <p><strong>🕐 ETA:</strong> ${rec.etaUTC ? new Date(rec.etaUTC).toUTCString() : (typeof eta === 'number' ? eta.toFixed(1) + ' h' : eta)}</p>
+          <p><strong>📊 Waypoints:</strong> ${optimized.length}</p>
+
+          ${rec.track?.length ? `
+            <hr>
+            <p><strong>🗺️ Track</strong></p>
+            <ol style="margin-left:18px;font-size:12px;line-height:1.6;">
+              ${rec.track.map(w => `<li>${w.lat.toFixed(3)}, ${w.lng.toFixed(3)}${w.note ? ' — <span style="color:var(--text-muted);">' + Utils.escapeHtml(w.note) + '</span>' : ''}</li>`).join('')}
+            </ol>` : ''}
+
+          ${ai.risks?.length ? `
+            <hr>
+            <p><strong>⚠️ Risks</strong></p>
+            <ol style="margin-left:18px;font-size:12px;line-height:1.6;">
+              ${ai.risks.map(r => `<li><b>${Utils.escapeHtml(r.hazardId || '')}</b> ${Utils.escapeHtml(r.description || '')}<br><span style="color:var(--text-muted);">→ ${Utils.escapeHtml(r.mitigation || '')}</span></li>`).join('')}
+            </ol>` : ''}
+
+          ${ai.alternates?.length ? `
+            <hr>
+            <p><strong>🔀 Alternates</strong></p>
+            <ul style="margin-left:18px;font-size:12px;line-height:1.6;">
+              ${ai.alternates.map(a => `<li><b>${Utils.escapeHtml(a.name || '')}</b> — ${a.distanceNm ?? '?'} NM <span style="color:var(--text-muted);">(${Utils.escapeHtml(a.tradeoff || '')})</span></li>`).join('')}
+            </ul>` : ''}
+
+          ${ai.watchItems?.length ? `
+            <hr>
+            <p><strong>👁️ Watch items</strong></p>
+            <ul style="margin-left:18px;font-size:12px;line-height:1.6;">
+              ${ai.watchItems.map(w => `<li>${Utils.escapeHtml(w)}</li>`).join('')}
+            </ul>` : ''}
+
+          ${ai.explanation ? `
+            <hr>
+            <p><strong>📝 Explanation</strong></p>
+            <p style="font-size:12px;color:var(--text-secondary);line-height:1.7;">${Utils.escapeHtml(ai.explanation)}</p>` : ''}
+
+          <p style="font-size:11px;color:var(--text-muted);margin-top:10px;">
+            ⚠️ Ice: ${(iceData?.concentration || 0).toFixed(1)}% ·
+            Wind: ${(weatherData?.windSpeed || 0).toFixed(0)} km/h ·
+            Hazards: ${hazardData?.length || 0}
+            ${ai.nextReassessmentUTC ? ` · reassess ${new Date(ai.nextReassessmentUTC).toUTCString()}` : ''}
+          </p>
+        </div>`;
+      return;
+    }
+
+    // Fallback: AI returned prose (or failed)
+    results.innerHTML = `
+      <div class="route-info">
+        <p><strong>📏 Distance:</strong> ${(routeResult.distance || totalDist).toFixed(1)} km</p>
+        <p><strong>⛽ Fuel efficiency:</strong> ${typeof fuel === 'number' ? fuel.toFixed(0) : fuel}%</p>
+        <p><strong>🕐 ETA:</strong> ${typeof eta === 'number' ? eta.toFixed(1) : eta} h</p>
+        <p><strong>📊 Waypoints:</strong> ${optimized.length}</p>
+        <hr>
+        <p><strong>🤖 AI:</strong></p>
+        <p style="font-size:12px;color:var(--text-muted);white-space:pre-wrap;">${Utils.escapeHtml(aiRaw || 'Route optimized.')}</p>
+        <p style="font-size:11px;color:var(--text-muted);margin-top:8px;">
+          ⚠️ Ice: ${(iceData?.concentration || 0).toFixed(1)}% ·
+          Wind: ${(weatherData?.windSpeed || 0).toFixed(0)} km/h
+        </p>
+      </div>`;
   }
 
   generateWaypoints(start, end, iceData, weatherData) {
@@ -533,8 +948,8 @@ class RouteManager {
     const out = [start];
     const latStep = (end.lat - start.lat) / (n + 1);
     const lngStep = (end.lng - start.lng) / (n + 1);
-    const iceOff = (iceData.concentration || 0) / 50;
-    const windOff = (weatherData.windSpeed || 0) / 20;
+    const iceOff = (iceData?.concentration || 0) / 50;
+    const windOff = (weatherData?.windSpeed || 0) / 20;
     for (let i = 1; i <= n; i++) {
       out.push({
         lat: start.lat + latStep * i + (Math.random() - 0.5) * iceOff,
@@ -562,7 +977,7 @@ class RouteManager {
 }
 
 // ------------------------------------------------------------
-// AI CHAT MANAGER
+// 8. AI CHAT MANAGER
 // ------------------------------------------------------------
 class AIManager {
   constructor() {
@@ -576,6 +991,7 @@ class AIManager {
     const saved = Utils.load('chatHistory');
     if (saved) { this.messages = saved; this.render(); }
   }
+
   save() {
     if (this.messages.length > 50) this.messages = this.messages.slice(-50);
     Utils.save('chatHistory', this.messages);
@@ -601,7 +1017,7 @@ class AIManager {
     const msg = input.value.trim();
     if (!msg || this.processing) return;
     input.value = '';
-    this.add('user', msg);
+    this.add('user', Utils.escapeHtml(msg));
     this.processing = true;
     const btn = document.getElementById('send-btn');
     if (btn) btn.disabled = true;
@@ -611,7 +1027,7 @@ class AIManager {
       const resp = await API.ai.chat(msg, ctx);
       this.add('ai', this.format(resp || 'I could not process that request. Try asking about ice, weather, or route optimization.'));
     } catch (e) {
-      this.add('ai', '❌ Error: ' + e.message);
+      this.add('ai', '❌ Error: ' + Utils.escapeHtml(e.message));
     } finally {
       this.processing = false;
       if (btn) btn.disabled = false;
@@ -623,16 +1039,26 @@ class AIManager {
     const ice = STATE.iceData || { concentration: 0, area: 'Unknown' };
     const weather = STATE.weather || { temp: 0, windSpeed: 0, description: 'Unknown' };
     const p = STATE.position;
+    const rankedHazards = (STATE.hazards || [])
+      .map(h => ({ ...h, _d: Utils.distance(p, h) / 1.852, _b: Utils.bearing(p, h) }))
+      .sort((a, b) => a._d - b._d)
+      .slice(0, 3);
+
+    const hazardLines = rankedHazards.length
+      ? rankedHazards.map((h, i) => `  H-${i + 1}: ${h.type} | ${h._b.toFixed(0)}°T | ${h._d.toFixed(1)}NM | ${h.severity || 'unknown'}`).join('\n')
+      : '  none detected';
+
     return `Position: ${p.lat.toFixed(4)}, ${p.lng.toFixed(4)}
-Ice: ${ice.concentration || 0}%
-Weather: ${weather.temp || 0}°C, ${weather.windSpeed || 0} km/h, ${weather.description || 'Unknown'}
-Hazards: ${STATE.hazards.length}
+Ice: ${(ice.concentration || 0).toFixed(1)}% (${ice.area || 'unknown'})
+Weather: ${(weather.temp ?? 0).toFixed(1)}°C, ${(weather.windSpeed || 0).toFixed(0)} km/h, ${weather.description || 'unknown'}
+Hazards (nearest):
+${hazardLines}
 User query: ${query}`;
   }
 
   format(text) {
     if (!text) return '<p>No response.</p>';
-    let html = text
+    let html = Utils.escapeHtml(text)
       .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
       .replace(/\*(.+?)\*/g, '<em>$1</em>')
       .replace(/\n/g, '<br>');
@@ -667,7 +1093,7 @@ User query: ${query}`;
 }
 
 // ------------------------------------------------------------
-// CAMERA MANAGER
+// 9. CAMERA MANAGER
 // ------------------------------------------------------------
 class CameraManager {
   constructor() {
@@ -680,6 +1106,11 @@ class CameraManager {
 
   async init() {
     if (this.active) { Utils.toast('📸 Camera already running', 'info'); return; }
+    if (!navigator.mediaDevices?.getUserMedia) {
+      Utils.toast('⚠️ Camera API unavailable — use upload', 'error');
+      document.getElementById('file-upload')?.click();
+      return;
+    }
     try {
       this.stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: this.facing, width: { ideal: 1280 } },
@@ -754,7 +1185,16 @@ class CameraManager {
       }
       const hazards = this.extractHazards(res);
       if (hazards.length) {
-        hazards.forEach(h => STATE.hazards.push({ ...h, detectedAt: new Date().toISOString(), source: 'camera' }));
+        hazards.forEach(h => STATE.hazards.push({
+          ...h,
+          id: Utils.uid(),
+          lat: STATE.position.lat + (Math.random() - 0.5) * 0.2,
+          lng: STATE.position.lng + (Math.random() - 0.5) * 0.2,
+          severity: 'medium',
+          detectedAt: new Date().toISOString(),
+          source: 'camera'
+        }));
+        window.mapManager?.updateHazards(STATE.hazards);
         Utils.toast(`⚠️ ${hazards.length} hazard(s) detected`, 'error');
       } else {
         Utils.toast('✅ No hazards detected', 'success');
@@ -765,11 +1205,11 @@ class CameraManager {
   }
 
   render(res) {
-    if (typeof res === 'string') return res;
+    if (typeof res === 'string') return Utils.escapeHtml(res);
     if (res?.analysis?.labels) {
       return `<p><strong>Detected:</strong></p><ul>${res.analysis.labels
         .slice(0, 6)
-        .map((l, i) => `<li>${l} — ${(res.analysis.scores[i] * 100).toFixed(1)}%</li>`)
+        .map((l, i) => `<li>${Utils.escapeHtml(l)} — ${(res.analysis.scores[i] * 100).toFixed(1)}%</li>`)
         .join('')}</ul>`;
     }
     return '<p>Analysis complete.</p>';
@@ -789,7 +1229,7 @@ class CameraManager {
 }
 
 // ------------------------------------------------------------
-// ADMIN MANAGER
+// 10. ADMIN MANAGER
 // ------------------------------------------------------------
 class AdminManager {
   constructor() {
@@ -833,6 +1273,7 @@ class AdminManager {
     Utils.toast(`✅ ${key} saved`, 'success');
     this.updateStatus();
     this.updateBanner();
+    this.renderAPIGrid();
   }
 
   async testKey(key) {
@@ -869,6 +1310,14 @@ class AdminManager {
     Utils.toast('✅ Prompt saved', 'success');
   }
 
+  resetPrompt() {
+    CONFIG.promptTemplate = DEFAULT_PROMPT_TEMPLATE;
+    Utils.save('promptTemplate', DEFAULT_PROMPT_TEMPLATE);
+    const ta = document.getElementById('prompt-template');
+    if (ta) ta.value = DEFAULT_PROMPT_TEMPLATE;
+    Utils.toast('✅ Prompt reset to default', 'success');
+  }
+
   updateStatus() {
     const box = document.getElementById('system-status');
     if (!box) return;
@@ -887,7 +1336,6 @@ class AdminManager {
     const banner = document.getElementById('api-status-banner');
     const text = document.getElementById('demo-banner-text');
     if (!banner || !text) return;
-    const total = Object.keys(CONFIG.apis).length;
     const ready = Object.values(CONFIG.apis).filter(a => a.key).length;
     if (ready === 0) {
       banner.hidden = false;
@@ -910,7 +1358,7 @@ class AdminManager {
 }
 
 // ------------------------------------------------------------
-// DATA POLLER
+// 11. DATA POLLER
 // ------------------------------------------------------------
 class DataPoller {
   constructor() { this.start(); }
@@ -918,6 +1366,10 @@ class DataPoller {
   start() {
     this.poll();
     this.interval = setInterval(() => this.poll(), CONFIG.pollingInterval);
+  }
+
+  stop() {
+    if (this.interval) { clearInterval(this.interval); this.interval = null; STATE.isPolling = false; }
   }
 
   async poll() {
@@ -932,6 +1384,9 @@ class DataPoller {
       STATE.weather = weather;
       STATE.iceData = ice;
       STATE.hazards = hazards;
+      STATE.lastWeatherUpdate = new Date().toISOString();
+      STATE.lastIceUpdate = new Date().toISOString();
+      STATE.lastHazardUpdate = new Date().toISOString();
 
       this.updateWeatherUI(weather);
       this.updateIceUI(ice);
@@ -963,7 +1418,7 @@ class DataPoller {
     if (card) {
       card.innerHTML = `
         <div class="value">${Math.round(w.temp)}°C</div>
-        <div class="label">${w.description}</div>
+        <div class="label">${Utils.escapeHtml(w.description || '')}</div>
         <div style="margin-top:8px;font-size:12px;color:var(--text-muted);line-height:1.7;">
           <div>Wind: ${Math.round(w.windSpeed)} km/h</div>
           <div>Humidity: ${Math.round(w.humidity)}%</div>
@@ -995,14 +1450,14 @@ class DataPoller {
     if (c) c.textContent = `${count} detected`;
     if (list) {
       list.innerHTML = (hazards || []).slice(0, 3).map(h =>
-        `<div style="padding:2px 0;">• ${h.type} (${h.severity || 'unknown'})</div>`
+        `<div style="padding:2px 0;">• ${Utils.escapeHtml(h.type)} (${Utils.escapeHtml(h.severity || 'unknown')})</div>`
       ).join('');
     }
   }
 }
 
 // ------------------------------------------------------------
-// APP CONTROLLER
+// 12. APP CONTROLLER
 // ------------------------------------------------------------
 class App {
   constructor() {
@@ -1050,15 +1505,15 @@ class App {
 
     const header = document.getElementById('chat-header');
     const toggle = document.getElementById('chat-toggle');
-    const doToggle = e => {
-      if (e && e.target.closest('#chat-toggle') !== toggle && e.target !== header && !header.contains(e.target)) return;
+    const doToggle = () => {
       const chat = document.getElementById('ai-chat');
+      if (!chat) return;
       chat.classList.toggle('minimized');
       const icon = toggle?.querySelector('i');
       if (icon) icon.className = chat.classList.contains('minimized') ? 'fas fa-chevron-up' : 'fas fa-chevron-down';
     };
     header?.addEventListener('click', doToggle);
-    toggle?.addEventListener('click', e => { e.stopPropagation(); doToggle(e); });
+    toggle?.addEventListener('click', e => { e.stopPropagation(); doToggle(); });
   }
 
   bindMapControls() {
@@ -1094,6 +1549,7 @@ class App {
         case 'upload-image': window.cameraManager.upload(); break;
         case 'analyze-image': window.cameraManager.analyze(); break;
         case 'save-prompt': window.adminManager.savePrompt(); break;
+        case 'reset-prompt': window.adminManager.resetPrompt(); break;
         case 'save-key': window.adminManager.saveKey(key); break;
         case 'test-key': window.adminManager.testKey(key); break;
       }
@@ -1139,7 +1595,7 @@ class App {
 }
 
 // ------------------------------------------------------------
-// BOOT
+// 13. BOOT
 // ------------------------------------------------------------
 document.addEventListener('DOMContentLoaded', () => {
   window.app = new App();
