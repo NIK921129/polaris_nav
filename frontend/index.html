@@ -1,273 +1,18 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <meta name="theme-color" content="#0a0e17">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#0a0e17" />
   <title>❄️ Polaris Nav — Antarctic Navigation</title>
+
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; }
-    body { background: #0a0e17; color: #eef4ff; overflow: hidden; height: 100vh; width: 100vw; }
-    #app { display: flex; height: 100vh; width: 100vw; position: relative; }
-
-    /* SIDEBAR LEFT */
-    #sidebar {
-      width: 90px;
-      background: rgba(18, 26, 40, 0.85);
-      backdrop-filter: blur(12px);
-      border-right: 1px solid rgba(255, 255, 255, 0.08);
-      display: flex; flex-direction: column; align-items: center;
-      padding: 20px 0; z-index: 100;
-    }
-    .glass {
-      background: rgba(18, 26, 40, 0.75);
-      backdrop-filter: blur(12px);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: 18px;
-      box-shadow: 0 15px 35px rgba(0, 0, 0, 0.5);
-    }
-    .logo { display: flex; flex-direction: column; align-items: center; gap: 6px; color: #7fd4ff; font-weight: 600; font-size: 14px; margin-bottom: 30px; }
-    .logo i { font-size: 28px; filter: drop-shadow(0 0 12px #3aa8ff); }
-    nav { display: flex; flex-direction: column; gap: 12px; width: 100%; padding: 0 8px; flex: 1; }
-    .nav-btn {
-      background: transparent; border: none; color: #a3b8d4; padding: 12px 0; border-radius: 14px;
-      display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 10px;
-      font-weight: 500; cursor: pointer; transition: all 0.2s; width: 100%;
-    }
-    .nav-btn i { font-size: 20px; }
-    .nav-btn:hover { background: rgba(90, 170, 255, 0.1); color: #b8dcff; }
-    .nav-btn.active { background: rgba(58, 168, 255, 0.2); color: #7fd4ff; box-shadow: inset 0 0 0 1px rgba(127, 212, 255, 0.3); }
-    .sidebar-status { display: flex; align-items: center; gap: 6px; font-size: 11px; color: #8aa3c9; margin-top: 10px; }
-    .status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
-    .status-dot.online { background: #4cd964; box-shadow: 0 0 12px #4cd964; }
-
-    /* MAP */
-    #map-container { flex: 1; position: relative; z-index: 1; }
-    #map { height: 100%; width: 100%; background: #111a2b; }
-    #map-controls {
-      position: absolute; bottom: 24px; right: 24px; display: flex; flex-direction: column; gap: 6px;
-      padding: 10px; border-radius: 16px; z-index: 500;
-    }
-    #map-controls button {
-      width: 42px; height: 42px; background: rgba(20, 30, 48, 0.8); border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: 12px; color: #b0caf0; font-size: 16px; cursor: pointer; transition: all 0.15s;
-      display: flex; align-items: center; justify-content: center; backdrop-filter: blur(6px);
-    }
-    #map-controls button:hover { background: #2a3f60; color: #fff; border-color: #3aa8ff; }
-
-    /* PAGES CONTAINER — TOP RIGHT */
-    #pages {
-      position: absolute;
-      top: 20px;
-      right: 20px;
-      width: 400px;
-      max-height: calc(100vh - 40px);
-      z-index: 400;
-      pointer-events: none;
-      transition: all 0.3s ease;
-    }
-    .page {
-      display: none;
-      pointer-events: auto;
-      width: 100%;
-      max-height: calc(100vh - 40px);
-      overflow-y: auto;
-      padding-right: 4px;
-      scrollbar-width: thin;
-      scrollbar-color: #2e4a6e transparent;
-    }
-    .page.active { display: block; }
-    .page::-webkit-scrollbar { width: 4px; }
-    .page::-webkit-scrollbar-thumb { background: #2e4a6e; border-radius: 20px; }
-
-    /* UNIVERSAL COLLAPSIBLE PANEL */
-    .collapsible-panel {
-      background: rgba(16, 24, 38, 0.85);
-      backdrop-filter: blur(16px);
-      border: 1px solid rgba(255, 255, 255, 0.06);
-      border-radius: 24px;
-      padding: 20px;
-      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.7);
-      color: #e2ecff;
-      transition: all 0.3s ease;
-      position: relative;
-      margin-bottom: 16px;
-    }
-    .collapsible-panel.minimized {
-      background: transparent; backdrop-filter: none; border: none; box-shadow: none;
-      padding: 0; width: 64px; height: 64px; margin-left: auto;
-    }
-    .collapsible-panel.minimized .panel-content { display: none; }
-    .collapsible-panel.minimized .panel-ball { display: flex; }
-
-    .panel-ball {
-      display: none;
-      position: absolute; top: 0; right: 0;
-      width: 64px; height: 64px; border-radius: 50%;
-      background: linear-gradient(135deg, #1d9bf0, #6b5eff);
-      border: 2px solid rgba(127, 212, 255, 0.5);
-      box-shadow: 0 8px 32px rgba(29, 155, 240, 0.6), 0 0 20px rgba(107, 94, 255, 0.4);
-      cursor: pointer;
-      align-items: center; justify-content: center;
-      color: #fff; font-size: 24px;
-      transition: all 0.3s ease;
-      z-index: 10;
-    }
-    .panel-ball:hover {
-      transform: scale(1.1);
-      box-shadow: 0 12px 40px rgba(29, 155, 240, 0.8), 0 0 30px rgba(107, 94, 255, 0.6);
-    }
-    .panel-ball i { filter: drop-shadow(0 2px 6px rgba(0,0,0,0.4)); }
-
-    .panel-header {
-      display: flex; justify-content: space-between; align-items: center;
-      margin-bottom: 16px;
-    }
-    .panel-header h2 {
-      font-size: 18px; font-weight: 600; display: flex; align-items: center; gap: 8px; color: #d4e6ff;
-    }
-    .panel-header h2 i { color: #3aa8ff; }
-
-    .btn-minimize {
-      background: rgba(255, 255, 255, 0.05);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      border-radius: 50%;
-      width: 34px; height: 34px;
-      display: flex; align-items: center; justify-content: center;
-      color: #8db4e0; cursor: pointer; transition: all 0.2s; font-size: 14px;
-    }
-    .btn-minimize:hover {
-      background: rgba(58, 168, 255, 0.2);
-      color: #fff;
-      border-color: #3aa8ff;
-    }
-
-    /* FORM ELEMENTS */
-    .route-inputs { display: flex; flex-direction: column; gap: 14px; }
-    .input-group { display: flex; flex-direction: column; gap: 6px; }
-    .input-group label {
-      font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; color: #7f9bc2; font-weight: 500;
-    }
-    .input-row { display: flex; gap: 8px; align-items: center; }
-    .input-row input {
-      flex: 1; background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(255, 255, 255, 0.1);
-      border-radius: 14px; padding: 12px 14px; color: #fff; font-size: 14px; outline: none;
-    }
-    .input-row input:focus { border-color: #3aa8ff; }
-    .btn-secondary {
-      background: rgba(60, 80, 110, 0.5); border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: 14px; padding: 12px 16px; color: #d0e2ff; font-size: 13px;
-      font-weight: 500; display: flex; align-items: center; gap: 8px; cursor: pointer;
-      white-space: nowrap; transition: all 0.15s;
-    }
-    .btn-secondary:hover { background: rgba(80, 120, 180, 0.5); border-color: #3aa8ff; }
-    .btn-primary {
-      background: linear-gradient(135deg, #1d9bf0, #6b5eff); border: none; border-radius: 40px;
-      padding: 16px 20px; font-size: 15px; font-weight: 600; color: #fff;
-      display: flex; align-items: center; justify-content: center; gap: 10px;
-      cursor: pointer; box-shadow: 0 8px 24px rgba(29, 155, 240, 0.3);
-      transition: all 0.2s; margin-top: 6px; width: 100%;
-    }
-    .btn-primary:hover { filter: brightness(1.15); box-shadow: 0 12px 32px rgba(29, 155, 240, 0.5); }
-    .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
-    select {
-      background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(255, 255, 255, 0.1);
-      border-radius: 14px; padding: 12px 14px; color: #fff; font-size: 14px; outline: none; cursor: pointer;
-    }
-
-    .route-results {
-      margin-top: 18px; border-top: 1px solid rgba(255, 255, 255, 0.08); padding-top: 16px;
-      display: none;
-    }
-    .route-results.show { display: block; }
-    .result-item {
-      display: flex; align-items: center; gap: 10px; font-size: 14px; margin-bottom: 10px; color: #c2d6f0;
-    }
-    .result-item i { width: 18px; color: #5eb0ff; }
-    .result-item strong { color: #fff; }
-    .ai-advisory {
-      background: rgba(0, 30, 70, 0.5); border-left: 4px solid #3aa8ff; padding: 14px 16px;
-      border-radius: 14px; margin-top: 14px; font-size: 13px; color: #b8d4ff;
-    }
-    .ai-advisory .ai-label {
-      font-weight: 600; color: #7fd4ff; display: flex; align-items: center; gap: 6px; margin-bottom: 6px;
-    }
-    .hazard-note {
-      font-size: 12px; color: #f5b042; display: flex; align-items: center; gap: 6px; margin-top: 10px;
-    }
-    .loading-row {
-      display: flex; align-items: center; gap: 10px; color: #7fd4ff; font-size: 13px; padding: 12px 0;
-    }
-
-    /* CAMERA / WEATHER / ADMIN specifics */
-    .camera-controls { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
-    .camera-container {
-      background: #000; border-radius: 18px; overflow: hidden; min-height: 180px;
-      display: flex; align-items: center; justify-content: center; color: #4a6a8a;
-    }
-    .weather-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-    .weather-card { background: rgba(0, 0, 0, 0.2); border-radius: 16px; padding: 14px; }
-    .weather-card h3 { font-size: 12px; text-transform: uppercase; color: #7f9bc2; margin-bottom: 8px; }
-    .admin-section { margin-bottom: 24px; }
-    .admin-section h3 { font-size: 14px; margin-bottom: 12px; color: #b0caf0; }
-    .admin-row { margin-bottom: 14px; }
-    .admin-row label { font-size: 12px; color: #8aa3c9; display: block; margin-bottom: 4px; }
-    .admin-row textarea, .admin-row select {
-      width: 100%; background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(255, 255, 255, 0.1);
-      border-radius: 14px; padding: 12px; color: #fff; font-size: 13px;
-    }
-    .api-status-grid { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 10px; }
-    .hint { font-size: 12px; color: #6d8ab0; }
-
-    /* AI CHAT */
-    #ai-chat {
-      position: absolute;
-      bottom: 20px;
-      right: 20px;
-      width: 400px;
-      background: rgba(16, 24, 38, 0.92);
-      backdrop-filter: blur(16px);
-      border-radius: 24px;
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      z-index: 600;
-      overflow: hidden;
-      transition: all 0.3s ease;
-    }
-    .chat-header { display: flex; align-items: center; padding: 14px 18px; background: rgba(30, 45, 70, 0.6); gap: 10px; cursor: pointer; }
-    .chat-header i { color: #5eb0ff; }
-    .chat-header span { flex: 1; font-weight: 500; }
-    .chat-toggle { background: transparent; border: none; color: #8aa3c9; cursor: pointer; font-size: 16px; }
-    .chat-body { max-height: 300px; display: flex; flex-direction: column; }
-    #chat-messages { flex: 1; overflow-y: auto; padding: 10px 16px; font-size: 13px; color: #b8d0f0; max-height: 180px; }
-    .chat-input { display: flex; border-top: 1px solid rgba(255, 255, 255, 0.06); padding: 8px; }
-    .chat-input input { flex: 1; background: rgba(0, 0, 0, 0.3); border: none; border-radius: 30px; padding: 10px 16px; color: #fff; outline: none; }
-    .chat-input button { background: #3aa8ff; border: none; border-radius: 50%; width: 42px; height: 42px; color: #fff; margin-left: 8px; cursor: pointer; }
-
-    /* DEMO BANNER */
-    .demo-banner {
-      position: fixed; top: 16px; left: 50%; transform: translateX(-50%);
-      background: rgba(255, 200, 60, 0.15); backdrop-filter: blur(10px);
-      border: 1px solid rgba(255, 200, 60, 0.4); color: #ffd966;
-      padding: 8px 20px; border-radius: 40px; font-size: 13px;
-      display: flex; align-items: center; gap: 10px; z-index: 1000; pointer-events: auto;
-    }
-    .demo-banner a { color: #7fd4ff; text-decoration: none; font-weight: 500; }
-    .demo-banner a:hover { text-decoration: underline; }
-    #toast-container { position: fixed; bottom: 30px; right: 30px; z-index: 2000; }
-    .toast { background: #1e2d48; color: #fff; padding: 14px 24px; border-radius: 50px; border-left: 6px solid #3aa8ff; margin-top: 10px; box-shadow: 0 15px 30px rgba(0,0,0,0.5); }
-
-    @media (max-width: 800px) {
-      #sidebar { width: 70px; }
-      #pages { width: calc(100% - 40px); right: 20px; }
-      #ai-chat { left: 90px; width: calc(100% - 110px); right: auto; }
-    }
-  </style>
+  <link rel="stylesheet" href="style.css" />
 </head>
 <body>
   <!-- DEMO BANNER -->
-  <div id="api-status-banner" class="demo-banner">
+  <div id="api-status-banner" class="demo-banner" hidden>
     <i class="fas fa-flask"></i>
     <span id="demo-banner-text">🎭 Demo Mode — using realistic mock data</span>
     <a href="#" id="banner-admin-link">Add API keys →</a>
@@ -278,15 +23,27 @@
     <aside id="sidebar" class="glass">
       <div class="logo">
         <i class="fas fa-snowflake"></i>
-        <span>POLARIS</span>
+        <span>Polaris</span>
       </div>
+
       <nav>
-        <button class="nav-btn" data-page="dashboard" title="Dashboard"><i class="fas fa-map"></i><span>Dashboard</span></button>
-        <button class="nav-btn active" data-page="route" title="Route Planner"><i class="fas fa-route"></i><span>Route</span></button>
-        <button class="nav-btn" data-page="camera" title="Camera"><i class="fas fa-camera"></i><span>Camera</span></button>
-        <button class="nav-btn" data-page="weather" title="Weather"><i class="fas fa-cloud-sun"></i><span>Weather</span></button>
-        <button class="nav-btn" data-page="admin" title="Admin"><i class="fas fa-cog"></i><span>Admin</span></button>
+        <button class="nav-btn active" data-page="dashboard" title="Dashboard">
+          <i class="fas fa-map"></i><span>Dashboard</span>
+        </button>
+        <button class="nav-btn" data-page="route" title="Route Planner">
+          <i class="fas fa-route"></i><span>Route</span>
+        </button>
+        <button class="nav-btn" data-page="camera" title="Camera">
+          <i class="fas fa-camera"></i><span>Camera</span>
+        </button>
+        <button class="nav-btn" data-page="weather" title="Weather">
+          <i class="fas fa-cloud-sun"></i><span>Weather</span>
+        </button>
+        <button class="nav-btn" data-page="admin" title="Admin">
+          <i class="fas fa-cog"></i><span>Admin</span>
+        </button>
       </nav>
+
       <div class="sidebar-status">
         <span class="status-dot online"></span>
         <span class="status-text" id="connection-status">Online</span>
@@ -309,118 +66,157 @@
     <!-- PAGES -->
     <section id="pages">
       <!-- DASHBOARD -->
-      <div id="page-dashboard" class="page">
-        <div class="widget glass">
-          <div class="widget-header"><i class="fas fa-cloud-sun"></i><h3>Weather</h3></div>
-          <div class="widget-content">
-            <div class="weather-temp">-18°C</div>
-            <div class="weather-desc">Heavy snow</div>
-            <div class="weather-details"><span><i class="fas fa-wind"></i> 34 km/h</span><span><i class="fas fa-tint"></i> 82%</span></div>
+      <div id="page-dashboard" class="page active">
+        <div class="dashboard-grid">
+          <div class="widget glass" id="weather-widget">
+            <div class="widget-header"><i class="fas fa-cloud-sun"></i><h3>Weather</h3></div>
+            <div class="widget-content">
+              <div class="weather-temp">--°C</div>
+              <div class="weather-desc">Loading…</div>
+              <div class="weather-details">
+                <span><i class="fas fa-wind"></i> -- km/h</span>
+                <span><i class="fas fa-tint"></i> --%</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="widget glass" id="ice-widget">
+            <div class="widget-header"><i class="fas fa-snowflake"></i><h3>Ice Concentration</h3></div>
+            <div class="widget-content">
+              <div class="ice-percentage">--%</div>
+              <div class="ice-status">Loading…</div>
+              <div class="ice-progress"><div class="ice-progress-bar" style="width:0%"></div></div>
+            </div>
+          </div>
+
+          <div class="widget glass" id="position-widget">
+            <div class="widget-header"><i class="fas fa-location-dot"></i><h3>Position</h3></div>
+            <div class="widget-content">
+              <div class="position-coords"><span>Lat: --°</span><span>Lng: --°</span></div>
+              <div class="position-status">Acquiring…</div>
+            </div>
+          </div>
+
+          <div class="widget glass" id="hazards-widget">
+            <div class="widget-header"><i class="fas fa-triangle-exclamation"></i><h3>Hazards</h3></div>
+            <div class="widget-content">
+              <div class="hazards-count">0 detected</div>
+              <div class="hazards-list"></div>
+            </div>
           </div>
         </div>
       </div>
 
       <!-- ROUTE -->
-      <div id="page-route" class="page active">
-        <div class="collapsible-panel" data-panel="route">
-          <div class="panel-ball" data-ball="route"><i class="fas fa-route"></i></div>
-          <div class="panel-content">
-            <div class="panel-header">
-              <h2><i class="fas fa-route"></i> Route Planner</h2>
-              <button class="btn-minimize" data-minimize="route" title="Minimize">
-                <i class="fas fa-minus"></i>
-              </button>
+      <div id="page-route" class="page">
+        <div class="route-panel glass">
+          <h2><i class="fas fa-route"></i> Route Planner</h2>
+          <div class="route-inputs">
+            <div class="input-group">
+              <label for="route-start">Start Location</label>
+              <div class="input-row">
+                <input type="text" id="route-start" placeholder="e.g. -70, 0" />
+                <button class="btn-secondary" data-action="set-start"><i class="fas fa-location-dot"></i> Set</button>
+              </div>
             </div>
-
-            <div class="route-inputs">
-              <div class="input-group">
-                <label for="route-start">Start Location</label>
-                <div class="input-row">
-                  <input type="text" id="route-start" value="-70, 0" placeholder="e.g. -70, 0" />
-                  <button class="btn-secondary" data-action="set-start"><i class="fas fa-location-dot"></i> Set</button>
-                </div>
+            <div class="input-group">
+              <label for="route-end">End Location</label>
+              <div class="input-row">
+                <input type="text" id="route-end" placeholder="e.g. -65, -60" />
+                <button class="btn-secondary" data-action="set-end"><i class="fas fa-location-dot"></i> Set</button>
               </div>
-              <div class="input-group">
-                <label for="route-end">End Location</label>
-                <div class="input-row">
-                  <input type="text" id="route-end" value="-65, -60" placeholder="e.g. -65, -60" />
-                  <button class="btn-secondary" data-action="set-end"><i class="fas fa-location-dot"></i> Set</button>
-                </div>
-              </div>
-              <div class="input-group">
-                <label for="vessel-type">Vessel Type</label>
-                <select id="vessel-type">
-                  <option value="research">Research Vessel</option>
-                  <option value="icebreaker" selected>Icebreaker</option>
-                  <option value="cargo">Cargo Ship</option>
-                </select>
-              </div>
-              <button class="btn-primary" id="optimizeBtn" data-action="optimize-route">
-                <i class="fas fa-route"></i> Optimize Route
-              </button>
             </div>
-
-            <div id="route-results" class="route-results"></div>
+            <div class="input-group">
+              <label for="vessel-type">Vessel Type</label>
+              <select id="vessel-type">
+                <option value="research">Research Vessel</option>
+                <option value="icebreaker">Icebreaker</option>
+                <option value="cargo">Cargo Ship</option>
+              </select>
+            </div>
+            <button class="btn-primary" data-action="optimize-route">
+              <i class="fas fa-route"></i> Optimize Route
+            </button>
           </div>
+          <div id="route-results" class="route-results"></div>
         </div>
       </div>
 
       <!-- CAMERA -->
       <div id="page-camera" class="page">
-        <div class="collapsible-panel" data-panel="camera">
-          <div class="panel-ball" data-ball="camera"><i class="fas fa-camera"></i></div>
-          <div class="panel-content">
-            <div class="panel-header">
-              <h2><i class="fas fa-camera"></i> Camera & Analysis</h2>
-              <button class="btn-minimize" data-minimize="camera" title="Minimize">
-                <i class="fas fa-minus"></i>
-              </button>
+        <div class="camera-panel glass">
+          <h2><i class="fas fa-camera"></i> Camera &amp; Analysis</h2>
+          <div class="camera-container">
+            <div id="camera-view">
+              <video id="camera-stream" autoplay playsinline muted></video>
+              <div id="camera-overlay" hidden>
+                <button class="btn-capture" data-action="capture" title="Capture">
+                  <i class="fas fa-circle"></i>
+                </button>
+              </div>
             </div>
-            <div class="camera-container"><div style="color:#4a6a8a;font-size:14px;">[ Camera preview ]</div></div>
-            <div class="camera-controls">
-              <button class="btn-secondary"><i class="fas fa-play"></i> Start</button>
-              <button class="btn-secondary"><i class="fas fa-rotate"></i> Switch</button>
-              <button class="btn-secondary"><i class="fas fa-upload"></i> Upload</button>
-              <button class="btn-primary"><i class="fas fa-robot"></i> Analyze</button>
-            </div>
+            <div id="camera-preview"></div>
           </div>
+          <div class="camera-controls">
+            <button class="btn-secondary" data-action="init-camera"><i class="fas fa-play"></i> Start</button>
+            <button class="btn-secondary" data-action="switch-camera"><i class="fas fa-rotate"></i> Switch</button>
+            <button class="btn-secondary" data-action="upload-image"><i class="fas fa-upload"></i> Upload</button>
+            <button class="btn-primary" data-action="analyze-image"><i class="fas fa-robot"></i> Analyze</button>
+          </div>
+          <div id="analysis-results" class="analysis-results"></div>
+          <input type="file" id="file-upload" accept="image/*" hidden />
         </div>
       </div>
 
       <!-- WEATHER -->
       <div id="page-weather" class="page">
-        <div class="collapsible-panel" data-panel="weather">
-          <div class="panel-ball" data-ball="weather"><i class="fas fa-cloud-sun"></i></div>
-          <div class="panel-content">
-            <div class="panel-header">
-              <h2><i class="fas fa-cloud-sun"></i> Weather & Ocean Data</h2>
-              <button class="btn-minimize" data-minimize="weather" title="Minimize">
-                <i class="fas fa-minus"></i>
-              </button>
-            </div>
-            <div class="weather-grid">
-              <div class="weather-card"><h3>Current</h3><div>-18°C · Snow</div></div>
-              <div class="weather-card"><h3>Forecast</h3><div>-20°C · Windy</div></div>
-              <div class="weather-card"><h3>Ocean</h3><div>-1.8°C · Calm</div></div>
-              <div class="weather-card"><h3>Wind</h3><div>34 km/h · SW</div></div>
-            </div>
+        <div class="weather-panel glass">
+          <h2><i class="fas fa-cloud-sun"></i> Weather &amp; Ocean Data</h2>
+          <div class="weather-grid">
+            <div class="weather-card"><h3>Current</h3><div id="current-weather"></div></div>
+            <div class="weather-card"><h3>Forecast</h3><div id="weather-forecast"></div></div>
+            <div class="weather-card"><h3>Ocean</h3><div id="ocean-data"></div></div>
+            <div class="weather-card"><h3>Wind</h3><div id="wind-data"></div></div>
           </div>
         </div>
       </div>
 
       <!-- ADMIN -->
       <div id="page-admin" class="page">
-        <div class="collapsible-panel" data-panel="admin">
-          <div class="panel-ball" data-ball="admin"><i class="fas fa-cog"></i></div>
-          <div class="panel-content">
-            <div class="panel-header">
-              <h2><i class="fas fa-cog"></i> Admin Panel</h2>
-              <button class="btn-minimize" data-minimize="admin" title="Minimize">
-                <i class="fas fa-minus"></i>
-              </button>
+        <div class="admin-panel glass">
+          <h2><i class="fas fa-cog"></i> Admin Panel</h2>
+
+          <div class="admin-section">
+            <h3>🔑 API Status</h3>
+            <div id="api-status" class="api-status-grid"></div>
+            <p class="hint"><i class="fas fa-info-circle"></i> Leave API keys blank to use <strong>DEMO DATA</strong>.</p>
+          </div>
+
+          <div class="admin-section">
+            <h3>API Keys</h3>
+            <div id="api-keys-container"></div>
+          </div>
+
+          <div class="admin-section">
+            <h3>AI Configuration</h3>
+            <div class="admin-row">
+              <label for="ai-model">Primary AI Model</label>
+              <select id="ai-model">
+                <option value="gemini">Google Gemini</option>
+                <option value="openai">OpenAI</option>
+                <option value="claude">Anthropic Claude</option>
+              </select>
             </div>
-            <div class="admin-section"><h3>🔑 API Status</h3><div>Demo mode</div></div>
-            <div class="admin-section"><h3>API Keys</h3><div>No keys set</div></div>
+            <div class="admin-row">
+              <label for="prompt-template">Prompt Template</label>
+              <textarea id="prompt-template" rows="6"></textarea>
+              <button class="btn-primary" data-action="save-prompt"><i class="fas fa-save"></i> Save Prompt</button>
+            </div>
+          </div>
+
+          <div class="admin-section">
+            <h3>System Status</h3>
+            <div id="system-status"></div>
           </div>
         </div>
       </div>
@@ -431,15 +227,17 @@
       <div class="chat-header" id="chat-header">
         <i class="fas fa-robot"></i>
         <span>AI Assistant</span>
-        <button class="chat-toggle" id="chat-toggle"><i class="fas fa-chevron-down"></i></button>
+        <button class="chat-toggle" id="chat-toggle" aria-label="Toggle chat">
+          <i class="fas fa-chevron-down"></i>
+        </button>
       </div>
-      <div class="chat-body" id="chatBody">
-        <div id="chat-messages">
-          <div style="margin-bottom:8px;"><i class="fas fa-robot" style="color:#5eb0ff;"></i> Welcome to <strong>Polaris Nav!</strong></div>
-        </div>
+      <div class="chat-body">
+        <div id="chat-messages"></div>
         <div class="chat-input">
-          <input type="text" id="user-input" placeholder="Ask about navigation…" />
-          <button data-action="send-message"><i class="fas fa-paper-plane"></i></button>
+          <input type="text" id="user-input" placeholder="Ask about navigation…" autocomplete="off" />
+          <button id="send-btn" data-action="send-message" aria-label="Send">
+            <i class="fas fa-paper-plane"></i>
+          </button>
         </div>
       </div>
     </div>
@@ -449,320 +247,7 @@
 
   <!-- LIBS -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script>
-    (function() {
-      // ============================================
-      // MAP
-      // ============================================
-      const map = L.map('map', { zoomControl: false, attributionControl: false }).setView([-70, 0], 3);
-      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom: 18, subdomains: 'abcd' }).addTo(map);
-
-      // Layers for route
-      let routeLine = null;
-      let routeMarkers = [];
-
-      // ============================================
-      // STATE
-      // ============================================
-      const STATE = {
-        position: { lat: -70, lng: 0 },
-        route: [],
-        iceData: null,
-        weather: null
-      };
-
-      // ============================================
-      // UTILS
-      // ============================================
-      const Utils = {
-        parseCoords(input) {
-          if (!input) return null;
-          const parts = String(input).trim().split(/[,\s]+/).filter(Boolean);
-          if (parts.length < 2) return null;
-          const lat = parseFloat(parts[0]);
-          const lng = parseFloat(parts[1]);
-          if (isNaN(lat) || isNaN(lng)) return null;
-          if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return null;
-          return { lat, lng };
-        },
-        distance(p1, p2) {
-          const R = 6371;
-          const dLat = (p2.lat - p1.lat) * Math.PI / 180;
-          const dLng = (p2.lng - p1.lng) * Math.PI / 180;
-          const a = Math.sin(dLat / 2) ** 2 +
-                    Math.cos(p1.lat * Math.PI / 180) * Math.cos(p2.lat * Math.PI / 180) *
-                    Math.sin(dLng / 2) ** 2;
-          return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-        },
-        formatCoords(lat, lng) {
-          return `${lat.toFixed(3)}, ${lng.toFixed(3)}`;
-        }
-      };
-
-      // ============================================
-      // PAGE NAVIGATION
-      // ============================================
-      const navBtns = document.querySelectorAll('.nav-btn');
-      const pages = document.querySelectorAll('.page');
-      navBtns.forEach(btn => {
-        btn.addEventListener('click', () => {
-          const targetPage = btn.dataset.page;
-          navBtns.forEach(b => b.classList.remove('active'));
-          btn.classList.add('active');
-          pages.forEach(p => p.classList.remove('active'));
-          document.getElementById('page-' + targetPage).classList.add('active');
-        });
-      });
-
-      // ============================================
-      // UNIVERSAL MINIMIZE / EXPAND
-      // ============================================
-      document.querySelectorAll('[data-minimize]').forEach(btn => {
-        btn.addEventListener('click', function(e) {
-          e.stopPropagation();
-          const id = btn.dataset.minimize;
-          const panel = document.querySelector(`[data-panel="${id}"]`);
-          if (panel) panel.classList.add('minimized');
-        });
-      });
-      document.querySelectorAll('[data-ball]').forEach(ball => {
-        ball.addEventListener('click', function(e) {
-          e.stopPropagation();
-          const id = ball.dataset.ball;
-          const panel = document.querySelector(`[data-panel="${id}"]`);
-          if (panel) panel.classList.remove('minimized');
-        });
-      });
-
-      // ============================================
-      // TOAST
-      // ============================================
-      function showToast(msg, type = 'info') {
-        const container = document.getElementById('toast-container');
-        const toast = document.createElement('div');
-        toast.className = 'toast';
-        toast.textContent = msg;
-        container.appendChild(toast);
-        setTimeout(() => toast.remove(), 2500);
-      }
-
-      // ============================================
-      // ROUTE OPTIMIZATION — the real thing
-      // ============================================
-      async function optimizeRoute() {
-        const startInput = document.getElementById('route-start');
-        const endInput = document.getElementById('route-end');
-        const vesselType = document.getElementById('vessel-type').value;
-        const resultsBox = document.getElementById('route-results');
-        const optimizeBtn = document.getElementById('optimizeBtn');
-
-        const start = Utils.parseCoords(startInput.value);
-        const end = Utils.parseCoords(endInput.value);
-
-        if (!start || !end) {
-          showToast('⚠️ Enter valid coordinates (e.g. -70, 0)', 'error');
-          return;
-        }
-
-        optimizeBtn.disabled = true;
-        optimizeBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Optimizing…';
-        resultsBox.classList.add('show');
-        resultsBox.innerHTML = '<div class="loading-row"><i class="fas fa-spinner fa-spin"></i> Fetching ice & weather data…</div>';
-
-        try {
-          // Simulate data fetch (replace with real API if you add keys later)
-          await new Promise(r => setTimeout(r, 400));
-          resultsBox.innerHTML = '<div class="loading-row"><i class="fas fa-spinner fa-spin"></i> Computing optimal path…</div>';
-          await new Promise(r => setTimeout(r, 400));
-
-          // Mock environmental data (would come from API in production)
-          const iceConc = 15 + Math.random() * 40;         // %
-          const windSpeed = 10 + Math.random() * 30;       // km/h
-          const temp = -5 + Math.random() * 15;            // °C
-
-          STATE.iceData = { concentration: iceConc };
-          STATE.weather = { windSpeed, temp };
-
-          // Generate waypoints between start and end
-          const numWaypoints = 3 + Math.floor(Math.random() * 3); // 3-5 intermediate
-          const waypoints = [start];
-          for (let i = 1; i <= numWaypoints; i++) {
-            const t = i / (numWaypoints + 1);
-            // Add some realistic jitter (routing around ice)
-            const jitterLat = (Math.random() - 0.5) * 0.6;
-            const jitterLng = (Math.random() - 0.5) * 0.6;
-            waypoints.push({
-              lat: start.lat + (end.lat - start.lat) * t + jitterLat,
-              lng: start.lng + (end.lng - start.lng) * t + jitterLng
-            });
-          }
-          waypoints.push(end);
-
-          STATE.route = waypoints;
-
-          // Draw on map
-          drawRoute(waypoints);
-
-          // Compute metrics
-          let totalDistKm = 0;
-          for (let i = 0; i < waypoints.length - 1; i++) {
-            totalDistKm += Utils.distance(waypoints[i], waypoints[i + 1]);
-          }
-          const totalDistNm = totalDistKm / 1.852;
-
-          // Vessel speed profiles
-          const vesselSpeeds = { research: 12, icebreaker: 10, cargo: 14 };
-          const baseSpeed = vesselSpeeds[vesselType] || 12;
-          // Reduce speed in ice and wind
-          const iceFactor = 1 - Math.min(iceConc / 150, 0.5);
-          const windFactor = 1 - Math.min(windSpeed / 200, 0.3);
-          const effectiveSpeed = baseSpeed * iceFactor * windFactor;
-
-          const etaHours = totalDistNm / effectiveSpeed;
-          const fuelEfficiency = Math.round(85 - iceConc / 3 - Math.max(0, windSpeed - 20) * 0.5);
-          const clampedFuel = Math.max(30, Math.min(100, fuelEfficiency));
-
-          // AI advisory text
-          const advisories = [];
-          if (iceConc > 40) advisories.push(`Ice concentration ${iceConc.toFixed(1)}% — reduce speed, watch for leads`);
-          if (iceConc > 60) advisories.push('Heavy ice — consider alternative route');
-          if (windSpeed > 30) advisories.push(`Strong winds ${windSpeed.toFixed(0)} km/h — expect drift`);
-          if (temp < -15) advisories.push('Freezing spray risk — monitor deck icing');
-          if (!advisories.length) advisories.push('Conditions favorable — proceed as planned');
-
-          // Render results
-          resultsBox.innerHTML = `
-            <div class="result-item"><i class="fas fa-ruler"></i> <strong>Distance:</strong> ${totalDistKm.toFixed(1)} km (${totalDistNm.toFixed(1)} NM)</div>
-            <div class="result-item"><i class="fas fa-gas-pump"></i> <strong>Fuel efficiency:</strong> ${clampedFuel}%</div>
-            <div class="result-item"><i class="fas fa-clock"></i> <strong>ETA:</strong> ${etaHours.toFixed(1)} h</div>
-            <div class="result-item"><i class="fas fa-map-pin"></i> <strong>Waypoints:</strong> ${waypoints.length}</div>
-            <div class="result-item"><i class="fas fa-gauge-high"></i> <strong>Effective speed:</strong> ${effectiveSpeed.toFixed(1)} kn</div>
-            <div class="ai-advisory">
-              <div class="ai-label"><i class="fas fa-robot"></i> AI:</div>
-              ${advisories.join('. ')}. Fuel efficiency ${clampedFuel}%.
-            </div>
-            <div class="hazard-note">
-              <i class="fas fa-exclamation-triangle"></i> Ice: ${iceConc.toFixed(1)}% · Wind: ${windSpeed.toFixed(0)} km/h · Temp: ${temp.toFixed(1)}°C
-            </div>
-          `;
-
-          showToast(`✅ Route optimized — ${totalDistKm.toFixed(0)} km`, 'success');
-        } catch (e) {
-          console.error(e);
-          resultsBox.innerHTML = `<div class="loading-row" style="color:#ff6b6b;"><i class="fas fa-exclamation-circle"></i> Error: ${e.message}</div>`;
-          showToast('❌ Route optimization failed', 'error');
-        } finally {
-          optimizeBtn.disabled = false;
-          optimizeBtn.innerHTML = '<i class="fas fa-route"></i> Optimize Route';
-        }
-      }
-
-      // ============================================
-      // DRAW ROUTE ON MAP
-      // ============================================
-      function drawRoute(waypoints) {
-        // Clear old
-        if (routeLine) { map.removeLayer(routeLine); routeLine = null; }
-        routeMarkers.forEach(m => map.removeLayer(m));
-        routeMarkers = [];
-
-        if (!waypoints || waypoints.length < 2) return;
-
-        const latlngs = waypoints.map(w => [w.lat, w.lng]);
-
-        // Dashed cyan line
-        routeLine = L.polyline(latlngs, {
-          color: '#00f0ff',
-          weight: 3,
-          opacity: 0.85,
-          dashArray: '10, 10',
-          lineJoin: 'round'
-        }).addTo(map);
-
-        // Numbered waypoint markers
-        waypoints.forEach((w, i) => {
-          const isStart = i === 0;
-          const isEnd = i === waypoints.length - 1;
-          const color = isStart ? '#4cd964' : isEnd ? '#ff5a5a' : '#3aa8ff';
-          const icon = L.divIcon({
-            className: 'waypoint-icon',
-            html: `<div style="width:26px;height:26px;border-radius:50%;background:${color};border:2px solid #fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#0a0e17;box-shadow:0 0 12px ${color};">${isStart ? 'S' : isEnd ? 'E' : i}</div>`,
-            iconSize: [26, 26],
-            iconAnchor: [13, 13]
-          });
-          const marker = L.marker([w.lat, w.lng], { icon })
-            .bindPopup(`<b>${isStart ? 'Start' : isEnd ? 'End' : 'Waypoint ' + i}</b><br>${w.lat.toFixed(3)}, ${w.lng.toFixed(3)}`)
-            .addTo(map);
-          routeMarkers.push(marker);
-        });
-
-        // Zoom map to fit route
-        try { map.fitBounds(latlngs, { padding: [60, 60] }); } catch {}
-      }
-
-      // ============================================
-      // ACTION BUTTONS
-      // ============================================
-      document.querySelectorAll('[data-action]').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-          const action = btn.dataset.action;
-
-          if (action === 'optimize-route') {
-            optimizeRoute();
-          } else if (action === 'set-start') {
-            const input = document.getElementById('route-start');
-            const coords = Utils.parseCoords(input.value) || STATE.position;
-            input.value = `${coords.lat}, ${coords.lng}`;
-            showToast(`✅ Start set: ${Utils.formatCoords(coords.lat, coords.lng)}`, 'success');
-          } else if (action === 'set-end') {
-            const input = document.getElementById('route-end');
-            const coords = Utils.parseCoords(input.value);
-            if (coords) {
-              showToast(`✅ End set: ${Utils.formatCoords(coords.lat, coords.lng)}`, 'success');
-            } else {
-              showToast('⚠️ Enter valid end coordinates', 'error');
-            }
-          } else if (action === 'send-message') {
-            const input = document.getElementById('user-input');
-            if (input.value.trim()) {
-              const msgs = document.getElementById('chat-messages');
-              const userMsg = input.value;
-              msgs.innerHTML += `<div style="margin-top:8px; text-align:right; color:#7fd4ff;">${userMsg}</div>`;
-              // Simple keyword-based response
-              const q = userMsg.toLowerCase();
-              let reply;
-              if (q.includes('ice')) reply = `Current ice concentration is ${(STATE.iceData?.concentration || 44).toFixed(1)}%. ${STATE.iceData?.concentration > 50 ? 'Reduce speed and watch for leads.' : 'Conditions manageable.'}`;
-              else if (q.includes('weather')) reply = `Wind ${(STATE.weather?.windSpeed || 34).toFixed(0)} km/h, temp ${(STATE.weather?.temp || -18).toFixed(1)}°C. ${STATE.weather?.windSpeed > 30 ? 'Strong winds expected.' : 'Calm conditions.'}`;
-              else if (q.includes('route')) reply = `Current route has ${STATE.route.length || 0} waypoints. Click "Optimize Route" to plan a new path.`;
-              else if (q.includes('hazard')) reply = `Monitoring ${Math.floor(2 + Math.random() * 4)} hazards in the area. Maintain 5 NM safe distance.`;
-              else reply = `I can help with ice conditions, weather forecasts, route planning, and hazard warnings. What would you like to know?`;
-              msgs.innerHTML += `<div style="margin-top:4px;"><i class="fas fa-robot" style="color:#5eb0ff;"></i> ${reply}</div>`;
-              msgs.scrollTop = msgs.scrollHeight;
-              input.value = '';
-            }
-          } else if (action === 'zoom-in') map.zoomIn();
-          else if (action === 'zoom-out') map.zoomOut();
-          else if (action === 'center-vessel') map.setView([STATE.position.lat, STATE.position.lng], 5);
-          else if (action === 'toggle-ice') showToast('❄️ Ice layer toggled (demo)', 'info');
-          else if (action === 'toggle-hazards') showToast('⚠️ Hazards layer toggled (demo)', 'info');
-          else if (action === 'toggle-weather') showToast('🌬️ Weather layer toggled (demo)', 'info');
-        });
-      });
-
-      // ============================================
-      // CHAT TOGGLE
-      // ============================================
-      const chatToggle = document.getElementById('chat-toggle');
-      const chatBody = document.getElementById('chatBody');
-      let chatOpen = true;
-      chatToggle.addEventListener('click', function() {
-        chatOpen = !chatOpen;
-        chatBody.style.display = chatOpen ? 'flex' : 'none';
-        chatToggle.innerHTML = chatOpen ? '<i class="fas fa-chevron-down"></i>' : '<i class="fas fa-chevron-up"></i>';
-      });
-
-      console.log('❄️ Polaris Nav loaded — try clicking "Optimize Route"');
-    })();
-  </script>
+  <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+  <script src="app.js"></script>
 </body>
 </html>
